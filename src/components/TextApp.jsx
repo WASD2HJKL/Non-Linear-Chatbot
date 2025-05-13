@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Form } from "react-bootstrap";
 import { BeatLoader } from "react-spinners";
+import OpenAI from "openai";
 
 import TextAppMessageList from "./TextAppMessageList";
 import Constants from "../constants/Constants";
 import useStorage from "../hook/useStorage";
+
+const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+
+const CS571 = new OpenAI({
+    apiKey: API_KEY,
+    dangerouslyAllowBrowser: true,
+});
 
 function TextApp({ persona, resetFlag }) {
     // Set to true to block the user from sending another message
@@ -22,64 +30,37 @@ function TextApp({ persona, resetFlag }) {
     async function handleSendAsStream(e) {
         e?.preventDefault();
         const input = inputRef.current.value?.trim();
+        if (!input) return;
+
         setIsLoading(true);
-        if (input) {
-            addMessage(Constants.Roles.User, input);
-            addMessageToChat(Constants.Roles.User, input);
-            inputRef.current.value = "";
-            const resp = await fetch(
-                "https://cs571api.cs.wisc.edu/rest/s25/hw11/completions-stream",
-                {
-                    method: "POST",
-                    headers: {
-                        "X-CS571-ID": CS571.getBadgerId(),
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify([
-                        ...messages,
-                        {
-                            role: Constants.Roles.User,
-                            content: input,
-                        },
-                    ]),
-                },
-            );
+        addMessage(Constants.Roles.User, input);
+        addMessageToChat(Constants.Roles.User, input);
+        inputRef.current.value = "";
 
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder("utf-8");
+        // initialize assistant message
+        addMessage(Constants.Roles.Assistant, "");
 
-            let unparsedLine = "";
-            let constructedString = "";
-            let done = false;
+        // call OpenAI’s streaming endpoint
+        const stream = await CS571.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                ...messages,
+                { role: "user", content: input },
+            ],
+            stream: true,
+        });
 
-            addMessage(Constants.Roles.Assistant, constructedString);
-
-            while (!done) {
-                const respObj = await reader.read();
-                const value = respObj.value;
-                done = respObj.done;
-                if (value) {
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk
-                        .split("\n")
-                        .filter((line) => line.trim() !== "");
-                    for (const line of lines) {
-                        try {
-                            let deltaObj = JSON.parse(unparsedLine + line);
-                            unparsedLine = "";
-                            constructedString += deltaObj.delta;
-
-                            // TODO You should display this to the user in realtime!
-                            updateLastMessageContent(constructedString);
-                        } catch (e) {
-                            unparsedLine += line;
-                        }
-                    }
-                }
+        let accumulated = "";
+        // the client returns an async iterable
+        for await (const part of stream) {
+            const delta = part.choices[0].delta.content;
+            if (delta) {
+                accumulated += delta;
+                updateLastMessageContent(accumulated);
             }
-
-            addMessageToChat(Constants.Roles.Assistant, constructedString);
         }
+
+        addMessageToChat(Constants.Roles.Assistant, accumulated);
         setIsLoading(false);
     }
 
