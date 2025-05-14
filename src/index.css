@@ -1,52 +1,94 @@
 .app {
-  font-family: Arial, sans-serif;
-  margin: 20px;
-  padding: 20px;
-  border: 1px solid #ccc;
-  max-width: 90vw;
-  margin: auto;
-  margin-top: 1rem
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    border: 1px solid #ccc;
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .inline-form {
-  display: flex;
-  width: 100%;
+    display: flex;
+    width: 100%;
 }
 
 .message-list {
-  overflow-y: auto;
-  overflow-x: hidden;
-  border: 1px solid #ccc;
-  margin-bottom: 10px;
-  padding: 10px;
-  background-color: #f9f9f9;
-  height: 70vh;
-  min-width: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #ccc;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    flex-grow: 1;
+    min-width: 250px;
 }
 
 .user-message {
-  background-color: white;
-  padding: 8px 8px 0 8px;
-  margin-right: 0.5rem;
-  border-radius: 10px;
-  float: right;
-  margin-left: auto;
-  overflow-wrap: break-word;
-  text-align: right;
+    background-color: white;
+    padding: 8px 8px 0 8px;
+    margin-right: 0.5rem;
+    border-radius: 10px;
+    float: right;
+    margin-left: auto;
+    overflow-wrap: break-word;
+    text-align: right;
 }
 
 .assistant-message {
-  background-color: lightblue;
-  padding: 8px 8px 0 8px;
-  margin-left: 0.5rem;
-  border-radius: 10px;
-  float: left;
-  margin-right: auto;
-  overflow-wrap: break-word;
-  text-align: left;
+    background-color: lightblue;
+    padding: 8px 8px 0 8px;
+    margin-left: 0.5rem;
+    border-radius: 10px;
+    float: left;
+    margin-right: auto;
+    overflow-wrap: break-word;
+    text-align: left;
 }
 
 .input-area {
-  display: flex;
-  justify-content: space-between;
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
 }
+
+/* ReactFlow Specific Styles */
+.react-flow__node {
+    cursor: pointer;
+}
+
+.react-flow__node-conversationNode {
+    font-size: 12px;
+    border-radius: 5px;
+    background: white;
+    border: 1px solid #777;
+}
+
+.react-flow__node.selected {
+    box-shadow: 0 0 0 2px #ff6060;
+}
+
+.react-flow__edge-path {
+    stroke: #888;
+    stroke-width: 2;
+}
+
+.react-flow__edge.animated path {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+    from {
+        stroke-dashoffset: 10;
+    }
+}
+
+.react-flow__handle {
+    width: 8px;
+    height: 8px;
+    background-color: #0096FF;
+}
+
+.react-flow__attribution {
+    display: none; }
