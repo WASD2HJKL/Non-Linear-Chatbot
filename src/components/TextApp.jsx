@@ -5,7 +5,6 @@ import OpenAI from "openai";
 
 import TextAppMessageList from "./TextAppMessageList";
 import Constants from "../constants/Constants";
-import useStorage from "../hook/useStorage";
 
 const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -14,14 +13,12 @@ const CS571 = new OpenAI({
     dangerouslyAllowBrowser: true,
 });
 
-function TextApp({ persona, resetFlag }) {
+function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
     // Set to true to block the user from sending another message
     const [isLoading, setIsLoading] = useState(false);
 
     const [messages, setMessages] = useState([]);
     const inputRef = useRef();
-
-    const [chat, setChat] = useStorage("chat", []);
 
     /**
      * Called whenever the "Send" button is pressed.
@@ -34,19 +31,15 @@ function TextApp({ persona, resetFlag }) {
 
         setIsLoading(true);
         addMessage(Constants.Roles.User, input);
-        addMessageToChat(Constants.Roles.User, input);
         inputRef.current.value = "";
 
         // initialize assistant message
         addMessage(Constants.Roles.Assistant, "");
 
-        // call OpenAI’s streaming endpoint
+        // call OpenAI's streaming endpoint
         const stream = await CS571.chat.completions.create({
             model: "gpt-4o-mini",
-            messages: [
-                ...messages,
-                { role: "user", content: input },
-            ],
+            messages: [...messages, { role: "user", content: input }],
             stream: true,
         });
 
@@ -60,7 +53,11 @@ function TextApp({ persona, resetFlag }) {
             }
         }
 
-        addMessageToChat(Constants.Roles.Assistant, accumulated);
+        // Notify parent about the new message pair
+        if (onNewMessagePair) {
+            onNewMessagePair(input, accumulated);
+        }
+
         setIsLoading(false);
     }
 
@@ -80,16 +77,6 @@ function TextApp({ persona, resetFlag }) {
         ]);
     }
 
-    const addMessageToChat = (role, content) => {
-        setChat((o) => [
-            ...o,
-            {
-                role: role,
-                content: content,
-            },
-        ]);
-    };
-
     const updateLastMessageContent = (msg) => {
         if (messages.length === 0) {
             return;
@@ -105,19 +92,13 @@ function TextApp({ persona, resetFlag }) {
         });
     };
 
+    // Load messages when initialMessages or resetFlag changes
     useEffect(() => {
-        setMessages([
-            {
-                role: Constants.Roles.Developer,
-                content: persona.prompt,
-            },
-            {
-                role: Constants.Roles.Assistant,
-                content: persona.initialMessage,
-            },
-        ]);
-        if (resetFlag > 0) {
-            setChat([
+        if (initialMessages && initialMessages.length > 0) {
+            setMessages(initialMessages);
+        } else {
+            // Default initialization
+            setMessages([
                 {
                     role: Constants.Roles.Developer,
                     content: persona.prompt,
@@ -128,13 +109,7 @@ function TextApp({ persona, resetFlag }) {
                 },
             ]);
         }
-    }, [persona, resetFlag]); // eslint-disable-line
-
-    useEffect(() => {
-        if (chat.length !== 0) {
-            setMessages(chat);
-        }
-    }, []);
+    }, [persona, resetFlag, initialMessages]);
 
     return (
         <div className="app">
