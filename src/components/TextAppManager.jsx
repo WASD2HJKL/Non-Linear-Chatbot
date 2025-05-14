@@ -57,6 +57,9 @@ export default function TextAppManager() {
     // Reset flag for TextApp
     const [resetFlag, setResetFlag] = useState(0);
 
+    // Store node positions so they're preserved between updates
+    const [nodePositions, setNodePositions] = useStorage("nodePositions", {});
+
     // Initialize or reset the conversation tree
     useEffect(() => {
         if (Object.keys(conversationTree).length === 0) {
@@ -80,6 +83,8 @@ export default function TextAppManager() {
             };
             setConversationTree(initialTree);
             setActiveBranchId("root");
+            // Reset node positions
+            setNodePositions({ root: { x: 50, y: 50 } });
         }
     }, [persona]);
 
@@ -95,6 +100,14 @@ export default function TextAppManager() {
         setActiveBranchId(branchId);
         // Increment resetFlag to tell TextApp to reload with the new messages
         setResetFlag((prev) => prev + 1);
+    };
+
+    // Update node positions when they change in the canvas
+    const handleNodePositionChange = (nodeId, position) => {
+        setNodePositions((prev) => ({
+            ...prev,
+            [nodeId]: position,
+        }));
     };
 
     // Create a new branch when a new message pair is added
@@ -123,6 +136,17 @@ export default function TextAppManager() {
             children: [],
         };
 
+        // Calculate position for the new node based on siblings
+        const parentPosition = nodePositions[activeBranchId] || { x: 0, y: 0 };
+        const siblingCount =
+            conversationTree[activeBranchId]?.children?.length || 0;
+
+        // Position the new node to the right and below based on number of siblings
+        const newPosition = {
+            x: parentPosition.x + 350, // Fixed horizontal spacing
+            y: parentPosition.y + siblingCount * 200, // Vertical positioning based on siblings
+        };
+
         // Add the new branch to the tree
         setConversationTree((prevTree) => {
             // Add the new branch
@@ -142,6 +166,12 @@ export default function TextAppManager() {
 
             return updatedTree;
         });
+
+        // Store the position of the new node
+        setNodePositions((prev) => ({
+            ...prev,
+            [newBranchId]: newPosition,
+        }));
 
         // Set the new branch as active
         setActiveBranchId(newBranchId);
@@ -169,6 +199,8 @@ export default function TextAppManager() {
         };
         setConversationTree(initialTree);
         setActiveBranchId("root");
+        // Reset node positions
+        setNodePositions({ root: { x: 50, y: 50 } });
         setResetFlag((prev) => prev + 1);
     }
 
@@ -207,7 +239,9 @@ export default function TextAppManager() {
                         <ConversationCanvas
                             conversationTree={conversationTree}
                             activeBranchId={activeBranchId}
+                            nodePositions={nodePositions}
                             onBranchSelect={handleBranchSelect}
+                            onNodePositionChange={handleNodePositionChange}
                         />
                     </div>
                 </Col>
