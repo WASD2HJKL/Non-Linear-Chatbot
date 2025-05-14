@@ -1,0 +1,6 @@
+{
+    "chatConfig": {
+        "prompt": "You are a helpful assistant. Your goal is to help the user with whatever queries they have.",
+        "initialMessage": "Hello! How can I help you today?"
+    }
+}

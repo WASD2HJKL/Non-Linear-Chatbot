@@ -1,44 +1,11 @@
 import { useState, useEffect } from "react";
 import TextApp from "./TextApp";
 import ConversationCanvas from "./ConversationCanvas";
-import {
-    Container,
-    Dropdown,
-    Nav,
-    NavItem,
-    NavLink,
-    Row,
-    Col,
-} from "react-bootstrap";
+import { Container, Nav, NavItem, Row, Col } from "react-bootstrap";
 import useStorage from "../hook/useStorage";
+import chatConfig from "../../config.json";
 
 export default function TextAppManager() {
-    const PERSONAS = [
-        {
-            name: "Bucky",
-            prompt: "You are a helpful assistant named Bucky after the UW-Madison Mascot. Your goal is to help the user with whatever queries they have.",
-            initialMessage: "Hello, my name is Bucky. How can I help you?",
-        },
-        {
-            name: "Pirate Pete",
-            prompt: "You are a helpful pirate assisting your mateys with their questions. Respond like a pirate would. Your goal is to help the user with whatever queries they have.",
-            initialMessage:
-                "Hello, my name is Pete the Pirate. How can I help you?",
-        },
-        {
-            name: "J.A.R.V.I.S.",
-            prompt: "You are J.A.R.V.I.S., Tony Stark's highly intelligent, composed, and extremely capable AI assistant. You speak with refined clarity, always polite, often dryly witty, and unshakably helpful under any circumstance.",
-            initialMessage:
-                "Good day. I am J.A.R.V.I.S., at your service. Please inform me of how I may assist you today — preferably before Mr. Stark asks me to launch anything into orbit.",
-        },
-    ];
-
-    const [personaName, setPersonaName] = useStorage(
-        "persona",
-        PERSONAS[0].name,
-    );
-    const persona = PERSONAS.find((p) => p.name === personaName);
-
     // Store all conversation branches
     const [conversationTree, setConversationTree] = useStorage(
         "conversationTree",
@@ -63,7 +30,7 @@ export default function TextAppManager() {
     // Initialize or reset the conversation tree
     useEffect(() => {
         if (Object.keys(conversationTree).length === 0) {
-            // Initialize with just the root branch containing persona messages
+            // Initialize with just the root branch containing config messages
             const initialTree = {
                 root: {
                     id: "root",
@@ -71,11 +38,11 @@ export default function TextAppManager() {
                     messages: [
                         {
                             role: "developer",
-                            content: persona.prompt,
+                            content: chatConfig.chatConfig.prompt,
                         },
                         {
                             role: "assistant",
-                            content: persona.initialMessage,
+                            content: chatConfig.chatConfig.initialMessage,
                         },
                     ],
                     children: [],
@@ -86,7 +53,7 @@ export default function TextAppManager() {
             // Reset node positions
             setNodePositions({ root: { x: 50, y: 50 } });
         }
-    }, [persona]);
+    }, []);
 
     // Load the active branch messages when active branch changes
     useEffect(() => {
@@ -187,11 +154,11 @@ export default function TextAppManager() {
                 messages: [
                     {
                         role: "developer",
-                        content: persona.prompt,
+                        content: chatConfig.chatConfig.prompt,
                     },
                     {
                         role: "assistant",
-                        content: persona.initialMessage,
+                        content: chatConfig.chatConfig.initialMessage,
                     },
                 ],
                 children: [],
@@ -204,31 +171,12 @@ export default function TextAppManager() {
         setResetFlag((prev) => prev + 1);
     }
 
-    // Handle persona change
-    function handleSwitchPersona(selectedPersona) {
-        setPersonaName(selectedPersona);
-        handleNewChat(); // Reset the conversation with the new persona
-    }
-
     return (
         <Container fluid style={{ marginTop: "0.25rem" }}>
             <Nav justify variant="tabs" className="mb-3">
                 <Nav.Item>
                     <Nav.Link onClick={handleNewChat}>New Chat</Nav.Link>
                 </Nav.Item>
-                <Dropdown as={NavItem} onSelect={handleSwitchPersona}>
-                    <Dropdown.Toggle as={NavLink}>Personas</Dropdown.Toggle>
-                    <Dropdown.Menu>
-                        {PERSONAS.map((p) => (
-                            <Dropdown.Item
-                                key={p.name}
-                                eventKey={p.name}
-                                active={personaName === p.name}>
-                                {p.name}
-                            </Dropdown.Item>
-                        ))}
-                    </Dropdown.Menu>
-                </Dropdown>
             </Nav>
 
             <Row>
@@ -250,10 +198,10 @@ export default function TextAppManager() {
                 <Col md={6}>
                     <h5>Active Conversation</h5>
                     <TextApp
-                        persona={persona}
                         resetFlag={resetFlag}
                         initialMessages={currentMessages}
                         onNewMessagePair={handleNewMessagePair}
+                        config={chatConfig.chatConfig}
                     />
                 </Col>
             </Row>

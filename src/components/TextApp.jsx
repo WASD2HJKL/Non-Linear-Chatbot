@@ -13,7 +13,7 @@ const CS571 = new OpenAI({
     dangerouslyAllowBrowser: true,
 });
 
-function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
+function TextApp({ resetFlag, initialMessages, onNewMessagePair, config }) {
     // Set to true to block the user from sending another message
     const [isLoading, setIsLoading] = useState(false);
 
@@ -101,15 +101,15 @@ function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
             setMessages([
                 {
                     role: Constants.Roles.Developer,
-                    content: persona.prompt,
+                    content: config.prompt,
                 },
                 {
                     role: Constants.Roles.Assistant,
-                    content: persona.initialMessage,
+                    content: config.initialMessage,
                 },
             ]);
         }
-    }, [persona, resetFlag, initialMessages]);
+    }, [resetFlag, initialMessages, config]);
 
     return (
         <div className="app">
