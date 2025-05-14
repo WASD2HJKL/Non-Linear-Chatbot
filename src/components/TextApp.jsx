@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Form } from "react-bootstrap";
 import { BeatLoader } from "react-spinners";
+import { nanoid } from 'nanoid';
 import OpenAI from "openai";
 
 import TextAppMessageList from "./TextAppMessageList";
@@ -9,7 +10,7 @@ import useStorage from "../hook/useStorage";
 
 const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
-const CS571 = new OpenAI({
+const agent = new OpenAI({
     apiKey: API_KEY,
     dangerouslyAllowBrowser: true,
 });
@@ -21,7 +22,8 @@ function TextApp({ persona, resetFlag }) {
     const [messages, setMessages] = useState([]);
     const inputRef = useRef();
 
-    const [chat, setChat] = useStorage("chat", []);
+    const [chatHistory, setChatHistory] = useStorage("chat", []);
+    const [lastChatID, setLastChatID] = useStorage("chatID", null);
 
     /**
      * Called whenever the "Send" button is pressed.
@@ -34,18 +36,18 @@ function TextApp({ persona, resetFlag }) {
 
         setIsLoading(true);
         addMessage(Constants.Roles.User, input);
-        addMessageToChat(Constants.Roles.User, input);
+        let userMessageID = addMessageToChatHistory(Constants.Roles.User, input, lastChatID);
         inputRef.current.value = "";
 
         // initialize assistant message
         addMessage(Constants.Roles.Assistant, "");
 
         // call OpenAI’s streaming endpoint
-        const stream = await CS571.chat.completions.create({
+        const stream = await agent.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
                 ...messages,
-                { role: "user", content: input },
+                { role: Constants.Roles.User, content: input },
             ],
             stream: true,
         });
@@ -60,7 +62,8 @@ function TextApp({ persona, resetFlag }) {
             }
         }
 
-        addMessageToChat(Constants.Roles.Assistant, accumulated);
+        let id = addMessageToChatHistory(Constants.Roles.Assistant, accumulated, userMessageID);
+        setLastChatID(id);
         setIsLoading(false);
     }
 
@@ -80,14 +83,19 @@ function TextApp({ persona, resetFlag }) {
         ]);
     }
 
-    const addMessageToChat = (role, content) => {
-        setChat((o) => [
-            ...o,
+    const addMessageToChatHistory = (role, content, pid) => {
+        const newChatID = nanoid();
+        setChatHistory((msg) => [
+            ...msg,
             {
                 role: role,
                 content: content,
+                ID: newChatID,
+                parentID: pid,
             },
         ]);
+
+        return newChatID;
     };
 
     const updateLastMessageContent = (msg) => {
@@ -117,7 +125,33 @@ function TextApp({ persona, resetFlag }) {
             },
         ]);
         if (resetFlag > 0) {
-            setChat([
+            setChatHistory([]);
+            let developerMessageID = addMessageToChatHistory(Constants.Roles.Developer, persona.prompt, null);
+            let AssistantInitialMessageID = addMessageToChatHistory(Constants.Roles.Assistant, persona.initialMessage, developerMessageID);
+            setLastChatID(AssistantInitialMessageID);
+        }
+    }, [persona, resetFlag]); // eslint-disable-line
+
+    function retrieveCurrentChat() {
+        if (chatHistory.length === 0) {
+            return [];
+        }
+
+        let id = lastChatID;
+        let chats = [];
+
+        while (id != null) {
+            const chat = chatHistory.find((msg) => msg.ID === id);
+            chats.push({ role: chat.role, content: chat.content });
+            id = chat.parentID;
+        }
+        chats.reverse();
+        return chats;
+    }
+
+    useEffect(() => {
+        if (chatHistory.length === 0) {
+            setMessages([
                 {
                     role: Constants.Roles.Developer,
                     content: persona.prompt,
@@ -127,14 +161,14 @@ function TextApp({ persona, resetFlag }) {
                     content: persona.initialMessage,
                 },
             ]);
+            let developerMessageID = addMessageToChatHistory(Constants.Roles.Developer, persona.prompt, null);
+            let AssistantInitialMessageID = addMessageToChatHistory(Constants.Roles.Assistant, persona.initialMessage, developerMessageID);
+            setLastChatID(AssistantInitialMessageID);
         }
-    }, [persona, resetFlag]); // eslint-disable-line
-
-    useEffect(() => {
-        if (chat.length !== 0) {
-            setMessages(chat);
+        if (chatHistory.length !== 0) {
+            setMessages(retrieveCurrentChat());
         }
-    }, []);
+    }, []);  // eslint-disable-line
 
     return (
         <div className="app">
@@ -158,3 +192,4 @@ function TextApp({ persona, resetFlag }) {
 }
 
 export default TextApp;
+
