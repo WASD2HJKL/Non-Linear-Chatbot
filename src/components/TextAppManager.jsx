@@ -1,21 +1,24 @@
 import { useState, useEffect } from "react";
 import TextApp from "./TextApp";
 import ConversationCanvas from "./ConversationCanvas";
-import { Container, Nav, NavItem, Row, Col } from "react-bootstrap";
+import Settings from "./Settings";
+import { Container, Nav, NavItem, Row, Col, Button } from "react-bootstrap";
+import { Gear } from "react-bootstrap-icons";
 import useStorage from "../hook/useStorage";
 import chatConfig from "../../config.json";
+import apiClientService from "../services/apiClientService";
 
 export default function TextAppManager() {
     // Store all conversation branches
     const [conversationTree, setConversationTree] = useStorage(
         "conversationTree",
-        {},
+        {}
     );
 
     // Track the currently active conversation branch
     const [activeBranchId, setActiveBranchId] = useStorage(
         "activeBranchId",
-        "root",
+        "root"
     );
 
     // Messages for the current active branch
@@ -26,6 +29,30 @@ export default function TextAppManager() {
 
     // Store node positions so they're preserved between updates
     const [nodePositions, setNodePositions] = useStorage("nodePositions", {});
+
+    // Settings modal state
+    const [showSettings, setShowSettings] = useState(false);
+
+    // API configuration
+    const [apiSettings, setApiSettings] = useState({
+        provider: chatConfig.apiConfig.defaultProvider,
+        model: chatConfig.apiConfig.defaultModel,
+        apiKey: "",
+    });
+
+    // Initialize API client and settings
+    useEffect(() => {
+        try {
+            const settings = apiClientService.init();
+            setApiSettings(settings);
+        } catch (error) {
+            console.error("Failed to initialize API client:", error);
+            // Show settings on first load if API key is missing
+            if (!localStorage.getItem("apiKey")) {
+                setShowSettings(true);
+            }
+        }
+    }, []);
 
     // Initialize or reset the conversation tree
     useEffect(() => {
@@ -171,11 +198,35 @@ export default function TextAppManager() {
         setResetFlag((prev) => prev + 1);
     }
 
+    // Handle settings changes
+    const handleApplySettings = (newSettings) => {
+        try {
+            apiClientService.setClient(
+                newSettings.provider,
+                newSettings.model,
+                newSettings.apiKey
+            );
+            setApiSettings(newSettings);
+        } catch (error) {
+            console.error("Failed to apply settings:", error);
+            alert("Failed to apply settings: " + error.message);
+        }
+    };
+
     return (
         <Container fluid style={{ marginTop: "0.25rem" }}>
             <Nav justify variant="tabs" className="mb-3">
                 <Nav.Item>
                     <Nav.Link onClick={handleNewChat}>New Chat</Nav.Link>
+                </Nav.Item>
+                <Nav.Item className="ml-auto">
+                    <Button
+                        variant="outline-secondary"
+                        onClick={() => setShowSettings(true)}
+                        title="API Settings"
+                    >
+                        <Gear /> API Settings
+                    </Button>
                 </Nav.Item>
             </Nav>
 
@@ -196,15 +247,28 @@ export default function TextAppManager() {
 
                 {/* TextApp for the actual conversation */}
                 <Col md={6}>
-                    <h5>Active Conversation</h5>
+                    <h5>
+                        Active Conversation
+                        <small className="text-muted ms-2">
+                            {apiSettings.provider}: {apiSettings.model}
+                        </small>
+                    </h5>
                     <TextApp
                         resetFlag={resetFlag}
                         initialMessages={currentMessages}
                         onNewMessagePair={handleNewMessagePair}
                         config={chatConfig.chatConfig}
+                        apiSettings={apiSettings}
                     />
                 </Col>
             </Row>
+
+            {/* Settings Modal */}
+            <Settings
+                show={showSettings}
+                onHide={() => setShowSettings(false)}
+                onApply={handleApplySettings}
+            />
         </Container>
     );
 }

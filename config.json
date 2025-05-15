@@ -2,5 +2,29 @@
     "chatConfig": {
         "prompt": "You are a helpful assistant. Your goal is to help the user with whatever queries they have.",
         "initialMessage": "Hello! How can I help you today?"
+    },
+    "apiConfig": {
+        "providers": [
+            {
+                "id": "openai",
+                "name": "OpenAI",
+                "models": [
+                    {
+                        "id": "gpt-4o-mini",
+                        "name": "GPT-4o Mini"
+                    },
+                    {
+                        "id": "gpt-4o",
+                        "name": "GPT-4o"
+                    },
+                    {
+                        "id": "gpt-3.5-turbo",
+                        "name": "GPT-3.5 Turbo"
+                    }
+                ]
+            }
+        ],
+        "defaultProvider": "openai",
+        "defaultModel": "gpt-4o-mini"
     }
 }

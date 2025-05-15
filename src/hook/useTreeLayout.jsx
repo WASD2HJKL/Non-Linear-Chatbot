@@ -53,7 +53,7 @@ export function useTreeLayout() {
                 conversationTree[nodeId].children.forEach((childId) => {
                     const childResult = calculatePositions(
                         childId,
-                        startY + totalChildrenHeight,
+                        startY + totalChildrenHeight
                     );
                     totalChildrenHeight += childResult.height;
                     childHeights.push(childResult.height);
@@ -98,7 +98,7 @@ export function useTreeLayout() {
 
             return newPositions;
         },
-        [],
+        []
     );
 
     return { calculateTreeLayout };

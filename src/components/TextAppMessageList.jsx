@@ -20,13 +20,14 @@ export default function TextAppMessageList({ messages }) {
                                 i === messages.length - 1 ? lastItem : undefined
                             }
                             key={i}
-                            style={{ marginBottom: "0.25rem" }}>
+                            style={{ marginBottom: "0.25rem" }}
+                        >
                             <Message
                                 role={message.role}
                                 content={message.content}
                             />
                         </Row>
-                    ),
+                    )
             )}
         </Container>
     );
