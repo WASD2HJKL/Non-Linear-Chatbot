@@ -8,7 +8,8 @@ const Message = (props) => {
                 width: "fit-content",
                 maxWidth: "80%",
                 display: "inline-block",
-            }}>
+            }}
+        >
             <Markdown>{props.content}</Markdown>
         </div>
     );

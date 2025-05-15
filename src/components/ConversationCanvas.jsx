@@ -9,6 +9,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import ConversationNode from "./ConversationNode";
+import useTreeLayout from "../hook/useTreeLayout";
 
 // Custom node types
 const nodeTypes = {
@@ -18,10 +19,46 @@ const nodeTypes = {
 function ConversationCanvas({
     conversationTree,
     activeBranchId,
+    nodePositions,
     onBranchSelect,
+    onNodePositionChange,
 }) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const { calculateTreeLayout } = useTreeLayout();
+
+    // Calculate better layout when tree changes
+    useEffect(() => {
+        if (!conversationTree || Object.keys(conversationTree).length === 0) {
+            return;
+        }
+
+        // Only calculate a new layout if there aren't existing positions
+        // This prevents positions from getting reset when the user has manually arranged them
+        const missingPositions = Object.keys(conversationTree).some(
+            (id) => id !== "root" && !nodePositions[id]
+        );
+
+        if (missingPositions) {
+            const newLayout = calculateTreeLayout(
+                conversationTree,
+                nodePositions
+            );
+            if (onNodePositionChange && Object.keys(newLayout).length > 0) {
+                // Update positions for any new nodes
+                Object.entries(newLayout).forEach(([nodeId, position]) => {
+                    if (!nodePositions[nodeId]) {
+                        onNodePositionChange(nodeId, position);
+                    }
+                });
+            }
+        }
+    }, [
+        conversationTree,
+        nodePositions,
+        calculateTreeLayout,
+        onNodePositionChange,
+    ]);
 
     // Convert the conversation tree to ReactFlow nodes and edges
     useEffect(() => {
@@ -32,11 +69,8 @@ function ConversationCanvas({
         const newNodes = [];
         const newEdges = [];
 
-        // Track positions to avoid overlaps
-        const positionTracker = {};
-
         // Create a node for each branch in the tree
-        const processNode = (branchId, level = 0, position = 0) => {
+        const processNode = (branchId) => {
             const branch = conversationTree[branchId];
             if (!branch) return;
 
@@ -44,8 +78,8 @@ function ConversationCanvas({
             const isRoot = branch.parentId === null;
             if (isRoot && branch.messages.length <= 2) {
                 // Process children of root
-                branch.children.forEach((childId, index) => {
-                    processNode(childId, level, index);
+                branch.children.forEach((childId) => {
+                    processNode(childId);
                 });
                 return;
             }
@@ -59,7 +93,7 @@ function ConversationCanvas({
                 if (messages.length >= 4) {
                     // At least developer, assistant, user, assistant
                     const lastUserIndex = messages.findLastIndex(
-                        (m) => m.role === "user",
+                        (m) => m.role === "user"
                     );
                     if (
                         lastUserIndex >= 0 &&
@@ -79,21 +113,32 @@ function ConversationCanvas({
                 };
             }
 
-            // Calculate position to avoid overlaps
-            if (!positionTracker[level]) {
-                positionTracker[level] = 0;
-            } else {
-                positionTracker[level]++;
-            }
+            // Use stored position if available or create a default
+            let position = nodePositions[branchId];
+            if (!position) {
+                // If no stored position, place relative to parent
+                const parentPosition = branch.parentId
+                    ? nodePositions[branch.parentId] || { x: 0, y: 0 }
+                    : { x: 0, y: 0 };
 
-            const xPosition = level * 300 + 50;
-            const yPosition = positionTracker[level] * 200 + 50;
+                const siblingIndex = branch.parentId
+                    ? conversationTree[branch.parentId].children.indexOf(
+                          branchId
+                      )
+                    : 0;
+
+                position = {
+                    x: parentPosition.x + 350,
+                    y: parentPosition.y + siblingIndex * 200,
+                };
+            }
 
             // Create node
             newNodes.push({
                 id: branch.id,
                 type: "conversationNode",
-                position: { x: xPosition, y: yPosition },
+                position: position,
+                dragHandle: ".drag-handle", // Allow dragging only from designated handle
                 data: {
                     question: nodeContent.question,
                     answer: nodeContent.answer,
@@ -117,8 +162,8 @@ function ConversationCanvas({
             }
 
             // Process children
-            branch.children.forEach((childId, index) => {
-                processNode(childId, level + 1, index);
+            branch.children.forEach((childId) => {
+                processNode(childId);
             });
         };
 
@@ -127,7 +172,7 @@ function ConversationCanvas({
 
         setNodes(newNodes);
         setEdges(newEdges);
-    }, [conversationTree, activeBranchId, onBranchSelect]);
+    }, [conversationTree, activeBranchId, nodePositions, onBranchSelect]);
 
     // Handle node click
     const onNodeClick = useCallback((event, node) => {
@@ -136,19 +181,53 @@ function ConversationCanvas({
         }
     }, []);
 
+    // Track node position changes when dragging ends
+    const onNodeDragStop = useCallback(
+        (event, node) => {
+            if (onNodePositionChange) {
+                onNodePositionChange(node.id, node.position);
+            }
+        },
+        [onNodePositionChange]
+    );
+
+    // Layout the graph automatically
+    const handleAutoLayout = useCallback(() => {
+        const newLayout = calculateTreeLayout(conversationTree, {});
+        if (onNodePositionChange) {
+            Object.entries(newLayout).forEach(([nodeId, position]) => {
+                onNodePositionChange(nodeId, position);
+            });
+        }
+    }, [conversationTree, calculateTreeLayout, onNodePositionChange]);
+
     return (
-        <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            fitView>
-            <Background />
-            <Controls />
-            <MiniMap />
-        </ReactFlow>
+        <div className="conversation-canvas">
+            <div className="canvas-toolbar">
+                <button
+                    className="auto-layout-button"
+                    onClick={handleAutoLayout}
+                    title="Auto-arrange nodes"
+                >
+                    Auto Layout
+                </button>
+            </div>
+
+            <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeClick={onNodeClick}
+                onNodeDragStop={onNodeDragStop}
+                nodeTypes={nodeTypes}
+                fitView
+            >
+                <Background />
+                <Controls />
+                <MiniMap />
+            </ReactFlow>
+        </div>
     );
 }
 

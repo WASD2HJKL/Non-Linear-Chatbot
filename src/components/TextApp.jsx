@@ -1,23 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Form } from "react-bootstrap";
+import { Button, Form, Alert } from "react-bootstrap";
 import { BeatLoader } from "react-spinners";
-import OpenAI from "openai";
 
 import TextAppMessageList from "./TextAppMessageList";
 import Constants from "../constants/Constants";
+import apiClientService from "../services/apiClientService";
 
-const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-const CS571 = new OpenAI({
-    apiKey: API_KEY,
-    dangerouslyAllowBrowser: true,
-});
-
-function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
+function TextApp({
+    resetFlag,
+    initialMessages,
+    onNewMessagePair,
+    config,
+    apiSettings,
+}) {
     // Set to true to block the user from sending another message
     const [isLoading, setIsLoading] = useState(false);
-
     const [messages, setMessages] = useState([]);
+    const [error, setError] = useState(null);
     const inputRef = useRef();
 
     /**
@@ -30,35 +29,52 @@ function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
         if (!input) return;
 
         setIsLoading(true);
+        setError(null);
         addMessage(Constants.Roles.User, input);
         inputRef.current.value = "";
 
         // initialize assistant message
         addMessage(Constants.Roles.Assistant, "");
 
-        // call OpenAI's streaming endpoint
-        const stream = await CS571.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [...messages, { role: "user", content: input }],
-            stream: true,
-        });
+        try {
+            // Use the apiClientService to make API calls
+            const stream = await apiClientService.createChatCompletion([
+                ...messages,
+                { role: "user", content: input },
+            ]);
 
-        let accumulated = "";
-        // the client returns an async iterable
-        for await (const part of stream) {
-            const delta = part.choices[0].delta.content;
-            if (delta) {
-                accumulated += delta;
-                updateLastMessageContent(accumulated);
+            let accumulated = "";
+            // Process the stream based on the provider
+            if (apiSettings.provider === "openai") {
+                // Handle OpenAI streaming
+                for await (const part of stream) {
+                    const delta = part.choices[0].delta.content;
+                    if (delta) {
+                        accumulated += delta;
+                        updateLastMessageContent(accumulated);
+                    }
+                }
+            } else if (apiSettings.provider === "anthropic") {
+                // This is a placeholder for Anthropic streaming
+                // In a real implementation, this would handle Anthropic's specific streaming format
+                throw new Error(
+                    "Anthropic API integration is incomplete in this demo"
+                );
             }
-        }
 
-        // Notify parent about the new message pair
-        if (onNewMessagePair) {
-            onNewMessagePair(input, accumulated);
+            // Notify parent about the new message pair
+            if (onNewMessagePair) {
+                onNewMessagePair(input, accumulated);
+            }
+        } catch (err) {
+            console.error("Error calling API:", err);
+            setError(`API Error: ${err.message || "Unknown error occurred"}`);
+            updateLastMessageContent(
+                "I'm sorry, there was an error communicating with the API. Please check your API settings and try again."
+            );
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     }
 
     /**
@@ -101,18 +117,38 @@ function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
             setMessages([
                 {
                     role: Constants.Roles.Developer,
-                    content: persona.prompt,
+                    content: config.prompt,
                 },
                 {
                     role: Constants.Roles.Assistant,
-                    content: persona.initialMessage,
+                    content: config.initialMessage,
                 },
             ]);
         }
-    }, [persona, resetFlag, initialMessages]);
+        setError(null);
+    }, [resetFlag, initialMessages, config]);
+
+    // Check if API key is set
+    const apiKeyMissing = !apiSettings.apiKey;
 
     return (
         <div className="app">
+            {error && (
+                <Alert
+                    variant="danger"
+                    onClose={() => setError(null)}
+                    dismissible
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {apiKeyMissing && (
+                <Alert variant="warning">
+                    Please set your API key in the settings to use the chat.
+                </Alert>
+            )}
+
             <TextAppMessageList messages={messages} />
             {isLoading ? <BeatLoader color="#36d7b7" /> : <></>}
             <div className="input-area">
@@ -122,8 +158,9 @@ function TextApp({ persona, resetFlag, initialMessages, onNewMessagePair }) {
                         style={{ marginRight: "0.5rem", display: "flex" }}
                         placeholder="Type a message..."
                         aria-label="Type and submit to send a message."
+                        disabled={isLoading || apiKeyMissing}
                     />
-                    <Button type="submit" disabled={isLoading}>
+                    <Button type="submit" disabled={isLoading || apiKeyMissing}>
                         Send
                     </Button>
                 </Form>

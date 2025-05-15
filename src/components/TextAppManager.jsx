@@ -1,54 +1,24 @@
 import { useState, useEffect } from "react";
 import TextApp from "./TextApp";
 import ConversationCanvas from "./ConversationCanvas";
-import {
-    Container,
-    Dropdown,
-    Nav,
-    NavItem,
-    NavLink,
-    Row,
-    Col,
-} from "react-bootstrap";
+import Settings from "./Settings";
+import { Container, Nav, NavItem, Row, Col, Button } from "react-bootstrap";
+import { Gear } from "react-bootstrap-icons";
 import useStorage from "../hook/useStorage";
+import chatConfig from "../../config.json";
+import apiClientService from "../services/apiClientService";
 
 export default function TextAppManager() {
-    const PERSONAS = [
-        {
-            name: "Bucky",
-            prompt: "You are a helpful assistant named Bucky after the UW-Madison Mascot. Your goal is to help the user with whatever queries they have.",
-            initialMessage: "Hello, my name is Bucky. How can I help you?",
-        },
-        {
-            name: "Pirate Pete",
-            prompt: "You are a helpful pirate assisting your mateys with their questions. Respond like a pirate would. Your goal is to help the user with whatever queries they have.",
-            initialMessage:
-                "Hello, my name is Pete the Pirate. How can I help you?",
-        },
-        {
-            name: "J.A.R.V.I.S.",
-            prompt: "You are J.A.R.V.I.S., Tony Stark's highly intelligent, composed, and extremely capable AI assistant. You speak with refined clarity, always polite, often dryly witty, and unshakably helpful under any circumstance.",
-            initialMessage:
-                "Good day. I am J.A.R.V.I.S., at your service. Please inform me of how I may assist you today — preferably before Mr. Stark asks me to launch anything into orbit.",
-        },
-    ];
-
-    const [personaName, setPersonaName] = useStorage(
-        "persona",
-        PERSONAS[0].name,
-    );
-    const persona = PERSONAS.find((p) => p.name === personaName);
-
     // Store all conversation branches
     const [conversationTree, setConversationTree] = useStorage(
         "conversationTree",
-        {},
+        {}
     );
 
     // Track the currently active conversation branch
     const [activeBranchId, setActiveBranchId] = useStorage(
         "activeBranchId",
-        "root",
+        "root"
     );
 
     // Messages for the current active branch
@@ -57,10 +27,37 @@ export default function TextAppManager() {
     // Reset flag for TextApp
     const [resetFlag, setResetFlag] = useState(0);
 
+    // Store node positions so they're preserved between updates
+    const [nodePositions, setNodePositions] = useStorage("nodePositions", {});
+
+    // Settings modal state
+    const [showSettings, setShowSettings] = useState(false);
+
+    // API configuration
+    const [apiSettings, setApiSettings] = useState({
+        provider: chatConfig.apiConfig.defaultProvider,
+        model: chatConfig.apiConfig.defaultModel,
+        apiKey: "",
+    });
+
+    // Initialize API client and settings
+    useEffect(() => {
+        try {
+            const settings = apiClientService.init();
+            setApiSettings(settings);
+        } catch (error) {
+            console.error("Failed to initialize API client:", error);
+            // Show settings on first load if API key is missing
+            if (!localStorage.getItem("apiKey")) {
+                setShowSettings(true);
+            }
+        }
+    }, []);
+
     // Initialize or reset the conversation tree
     useEffect(() => {
         if (Object.keys(conversationTree).length === 0) {
-            // Initialize with just the root branch containing persona messages
+            // Initialize with just the root branch containing config messages
             const initialTree = {
                 root: {
                     id: "root",
@@ -68,11 +65,11 @@ export default function TextAppManager() {
                     messages: [
                         {
                             role: "developer",
-                            content: persona.prompt,
+                            content: chatConfig.chatConfig.prompt,
                         },
                         {
                             role: "assistant",
-                            content: persona.initialMessage,
+                            content: chatConfig.chatConfig.initialMessage,
                         },
                     ],
                     children: [],
@@ -80,8 +77,10 @@ export default function TextAppManager() {
             };
             setConversationTree(initialTree);
             setActiveBranchId("root");
+            // Reset node positions
+            setNodePositions({ root: { x: 50, y: 50 } });
         }
-    }, [persona]);
+    }, []);
 
     // Load the active branch messages when active branch changes
     useEffect(() => {
@@ -95,6 +94,14 @@ export default function TextAppManager() {
         setActiveBranchId(branchId);
         // Increment resetFlag to tell TextApp to reload with the new messages
         setResetFlag((prev) => prev + 1);
+    };
+
+    // Update node positions when they change in the canvas
+    const handleNodePositionChange = (nodeId, position) => {
+        setNodePositions((prev) => ({
+            ...prev,
+            [nodeId]: position,
+        }));
     };
 
     // Create a new branch when a new message pair is added
@@ -123,6 +130,17 @@ export default function TextAppManager() {
             children: [],
         };
 
+        // Calculate position for the new node based on siblings
+        const parentPosition = nodePositions[activeBranchId] || { x: 0, y: 0 };
+        const siblingCount =
+            conversationTree[activeBranchId]?.children?.length || 0;
+
+        // Position the new node to the right and below based on number of siblings
+        const newPosition = {
+            x: parentPosition.x + 350, // Fixed horizontal spacing
+            y: parentPosition.y + siblingCount * 200, // Vertical positioning based on siblings
+        };
+
         // Add the new branch to the tree
         setConversationTree((prevTree) => {
             // Add the new branch
@@ -143,6 +161,12 @@ export default function TextAppManager() {
             return updatedTree;
         });
 
+        // Store the position of the new node
+        setNodePositions((prev) => ({
+            ...prev,
+            [newBranchId]: newPosition,
+        }));
+
         // Set the new branch as active
         setActiveBranchId(newBranchId);
     };
@@ -157,11 +181,11 @@ export default function TextAppManager() {
                 messages: [
                     {
                         role: "developer",
-                        content: persona.prompt,
+                        content: chatConfig.chatConfig.prompt,
                     },
                     {
                         role: "assistant",
-                        content: persona.initialMessage,
+                        content: chatConfig.chatConfig.initialMessage,
                     },
                 ],
                 children: [],
@@ -169,14 +193,25 @@ export default function TextAppManager() {
         };
         setConversationTree(initialTree);
         setActiveBranchId("root");
+        // Reset node positions
+        setNodePositions({ root: { x: 50, y: 50 } });
         setResetFlag((prev) => prev + 1);
     }
 
-    // Handle persona change
-    function handleSwitchPersona(selectedPersona) {
-        setPersonaName(selectedPersona);
-        handleNewChat(); // Reset the conversation with the new persona
-    }
+    // Handle settings changes
+    const handleApplySettings = (newSettings) => {
+        try {
+            apiClientService.setClient(
+                newSettings.provider,
+                newSettings.model,
+                newSettings.apiKey
+            );
+            setApiSettings(newSettings);
+        } catch (error) {
+            console.error("Failed to apply settings:", error);
+            alert("Failed to apply settings: " + error.message);
+        }
+    };
 
     return (
         <Container fluid style={{ marginTop: "0.25rem" }}>
@@ -184,19 +219,15 @@ export default function TextAppManager() {
                 <Nav.Item>
                     <Nav.Link onClick={handleNewChat}>New Chat</Nav.Link>
                 </Nav.Item>
-                <Dropdown as={NavItem} onSelect={handleSwitchPersona}>
-                    <Dropdown.Toggle as={NavLink}>Personas</Dropdown.Toggle>
-                    <Dropdown.Menu>
-                        {PERSONAS.map((p) => (
-                            <Dropdown.Item
-                                key={p.name}
-                                eventKey={p.name}
-                                active={personaName === p.name}>
-                                {p.name}
-                            </Dropdown.Item>
-                        ))}
-                    </Dropdown.Menu>
-                </Dropdown>
+                <Nav.Item className="ml-auto">
+                    <Button
+                        variant="outline-secondary"
+                        onClick={() => setShowSettings(true)}
+                        title="API Settings"
+                    >
+                        <Gear /> API Settings
+                    </Button>
+                </Nav.Item>
             </Nav>
 
             <Row>
@@ -207,22 +238,37 @@ export default function TextAppManager() {
                         <ConversationCanvas
                             conversationTree={conversationTree}
                             activeBranchId={activeBranchId}
+                            nodePositions={nodePositions}
                             onBranchSelect={handleBranchSelect}
+                            onNodePositionChange={handleNodePositionChange}
                         />
                     </div>
                 </Col>
 
                 {/* TextApp for the actual conversation */}
                 <Col md={6}>
-                    <h5>Active Conversation</h5>
+                    <h5>
+                        Active Conversation
+                        <small className="text-muted ms-2">
+                            {apiSettings.provider}: {apiSettings.model}
+                        </small>
+                    </h5>
                     <TextApp
-                        persona={persona}
                         resetFlag={resetFlag}
                         initialMessages={currentMessages}
                         onNewMessagePair={handleNewMessagePair}
+                        config={chatConfig.chatConfig}
+                        apiSettings={apiSettings}
                     />
                 </Col>
             </Row>
+
+            {/* Settings Modal */}
+            <Settings
+                show={showSettings}
+                onHide={() => setShowSettings(false)}
+                onApply={handleApplySettings}
+            />
         </Container>
     );
 }

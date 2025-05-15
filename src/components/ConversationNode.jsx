@@ -1,8 +1,10 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Handle, Position } from "reactflow";
+import { Button } from "react-bootstrap";
 
 function ConversationNode({ data, isConnectable }) {
-    const { question, answer, isSelected } = data;
+    const { question, answer, isSelected, onClick } = data;
+    const [expanded, setExpanded] = useState(false);
 
     // Node styling
     const nodeStyle = {
@@ -18,6 +20,7 @@ function ConversationNode({ data, isConnectable }) {
         transition: "all 0.3s ease",
         fontSize: "14px",
         overflow: "hidden",
+        position: "relative",
     };
 
     // Truncate text longer than a certain length
@@ -28,15 +31,44 @@ function ConversationNode({ data, isConnectable }) {
             : text;
     };
 
+    // Handle clicks on the node
+    const handleNodeClick = (e) => {
+        e.stopPropagation();
+        if (onClick) onClick();
+    };
+
+    // Toggle expanded state for the node
+    const toggleExpand = (e) => {
+        e.stopPropagation();
+        setExpanded(!expanded);
+    };
+
     return (
-        <div style={nodeStyle}>
+        <div style={nodeStyle} onClick={handleNodeClick}>
+            {/* Drag handle */}
+            <div
+                className="drag-handle"
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "14px",
+                    background: isSelected ? "#0096FF" : "#f0f0f0",
+                    borderTopLeftRadius: "8px",
+                    borderTopRightRadius: "8px",
+                    cursor: "move",
+                    zIndex: 1,
+                }}
+            />
+
             <Handle
                 type="target"
                 position={Position.Left}
                 isConnectable={isConnectable}
             />
 
-            <div style={{ textAlign: "left" }}>
+            <div style={{ textAlign: "left", marginTop: "10px" }}>
                 {question && (
                     <div
                         style={{
@@ -44,10 +76,11 @@ function ConversationNode({ data, isConnectable }) {
                             padding: "8px",
                             borderRadius: "6px",
                             marginBottom: "8px",
-                        }}>
+                        }}
+                    >
                         <strong>User:</strong>
                         <p style={{ margin: 0, fontSize: "12px" }}>
-                            {truncateText(question, 100)}
+                            {expanded ? question : truncateText(question, 100)}
                         </p>
                     </div>
                 )}
@@ -57,12 +90,28 @@ function ConversationNode({ data, isConnectable }) {
                         padding: "8px",
                         background: "#e8f4fd",
                         borderRadius: "6px",
-                    }}>
+                    }}
+                >
                     <strong>Assistant:</strong>
                     <p style={{ margin: 0, fontSize: "12px" }}>
-                        {truncateText(answer, 150)}
+                        {expanded ? answer : truncateText(answer, 150)}
                     </p>
                 </div>
+
+                {(question?.length > 100 || answer?.length > 150) && (
+                    <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={toggleExpand}
+                        style={{
+                            marginTop: "8px",
+                            width: "100%",
+                            fontSize: "10px",
+                        }}
+                    >
+                        {expanded ? "Collapse" : "Expand"}
+                    </Button>
+                )}
             </div>
 
             <Handle
