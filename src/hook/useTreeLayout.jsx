@@ -1,107 +1,75 @@
 import { useCallback } from "react";
+import { createLayoutService } from "../services/layoutService.js";
 
-// This utility organizes nodes in a tree layout
+// This utility organizes nodes in a tree layout with context-awareness
 export function useTreeLayout() {
-    // Calculate layout for the entire tree
+    const layoutService = createLayoutService("dagre");
+    // Calculate layout for conversation nodes using modern layout service
     const calculateTreeLayout = useCallback(
-        (conversationTree, nodePositions = {}) => {
-            if (
-                !conversationTree ||
-                Object.keys(conversationTree).length === 0
-            ) {
+        async (nodes, dimensions = new Map(), options = {}) => {
+            if (!nodes || nodes.length === 0) {
                 return {};
             }
 
-            const newPositions = { ...nodePositions };
-            const horizontalSpacing = 350; // Space between levels
-            const verticalSpacing = 200; // Space between siblings
+            try {
+                // Convert nodes to format expected by layout service
+                const layoutNodes = nodes.map((node) => ({
+                    id: node.id,
+                    width: dimensions.get(node.id)?.width || node.width || 250,
+                    height: dimensions.get(node.id)?.height || 100,
+                    isPinned: node.isPinned || false,
+                    x: node.x,
+                    y: node.y,
+                }));
 
-            // First pass: determine level and siblings for each node
-            const nodeInfo = {};
+                // Create edges from parent-child relationships
+                const edges = nodes
+                    .filter((node) => node.parentId)
+                    .map((node) => ({
+                        source: node.parentId,
+                        target: node.id,
+                    }));
 
-            const analyzeTree = (nodeId, level = 0) => {
-                if (!conversationTree[nodeId]) return;
+                // Calculate layout using service
+                const result = await layoutService.calculateLayout(layoutNodes, edges, options);
 
-                // Record the node's level
-                nodeInfo[nodeId] = {
-                    level,
-                    children: conversationTree[nodeId].children.length,
-                };
-
-                // Process children
-                conversationTree[nodeId].children.forEach((childId) => {
-                    analyzeTree(childId, level + 1);
-                });
-            };
-
-            // Start analysis from root
-            analyzeTree("root");
-
-            // Second pass: calculate positions for each node
-            const calculatePositions = (nodeId, startY = 50) => {
-                if (!conversationTree[nodeId]) return { height: 0 };
-
-                // Skip the root node if it only has the initial system/assistant messages
-                const isRoot = conversationTree[nodeId].parentId === null;
-                const skipNode =
-                    isRoot && conversationTree[nodeId].messages.length <= 2;
-
-                // Process children first to calculate total height
-                let totalChildrenHeight = 0;
-                let childHeights = [];
-
-                conversationTree[nodeId].children.forEach((childId) => {
-                    const childResult = calculatePositions(
-                        childId,
-                        startY + totalChildrenHeight
-                    );
-                    totalChildrenHeight += childResult.height;
-                    childHeights.push(childResult.height);
-                });
-
-                // If no children, this node has a fixed height
-                if (totalChildrenHeight === 0) {
-                    totalChildrenHeight = verticalSpacing;
+                if (result.success) {
+                    // Convert back to position object format
+                    const positions = {};
+                    result.positions.forEach((position, nodeId) => {
+                        positions[nodeId] = position;
+                    });
+                    return positions;
+                } else {
+                    console.error("Layout calculation failed:", result.error);
+                    return _createFallbackLayout(nodes);
                 }
-
-                // Determine position for this node
-                if (!skipNode) {
-                    const level = nodeInfo[nodeId].level;
-
-                    // If position already exists, keep X and just adjust Y if needed
-                    const existingPos = newPositions[nodeId];
-                    if (existingPos) {
-                        // Keep existing X position but adjust Y if it would overlap with siblings
-                        const centerY = startY + totalChildrenHeight / 2;
-                        if (
-                            Math.abs(existingPos.y - centerY) > verticalSpacing
-                        ) {
-                            newPositions[nodeId] = {
-                                x: existingPos.x,
-                                y: centerY,
-                            };
-                        }
-                    } else {
-                        // New position
-                        newPositions[nodeId] = {
-                            x: level * horizontalSpacing + 50,
-                            y: startY + totalChildrenHeight / 2,
-                        };
-                    }
-                }
-
-                return { height: totalChildrenHeight };
-            };
-
-            // Calculate positions starting from root
-            calculatePositions("root");
-
-            return newPositions;
+            } catch (error) {
+                console.error("Tree layout calculation error:", error);
+                return _createFallbackLayout(nodes);
+            }
         },
-        []
+        [layoutService],
     );
 
-    return { calculateTreeLayout };
+    // Create fallback layout for error cases
+    const _createFallbackLayout = useCallback((nodes) => {
+        const positions = {};
+        const gridCols = Math.ceil(Math.sqrt(nodes.length));
+
+        nodes.forEach((node, index) => {
+            const col = index % gridCols;
+            const row = Math.floor(index / gridCols);
+            positions[node.id] = {
+                x: col * 350,
+                y: row * 200,
+            };
+        });
+
+        return positions;
+    }, []);
+
+    return { calculateTreeLayout, _createFallbackLayout };
 }
 
 export default useTreeLayout;

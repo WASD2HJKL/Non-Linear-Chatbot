@@ -1,126 +1,212 @@
-# Non-Linear Chatbot
+# Non-Linear Chatbot 🌳
 
-While learning new concepts using large language models like ChatGPT, I often found myself overwhelmed when a single response introduced multiple unfamiliar ideas. Although follow-up questions can help clarify these concepts, they often lead to even more new terms—creating a recursive loop of confusion.
+[![GitHub stars](https://img.shields.io/github/stars/WASD2HJKL/Non-Linear-Chatbot?style=for-the-badge&logo=github&label=Stars&logoColor=white&color=ffda65)](https://github.com/WASD2HJKL/Non-Linear-Chatbot/stargazers)
 
-Currently, ChatGPT conversations are largely linear. While you can shift directions mid-conversation, the interface isn't particularly user-friendly when it comes to tracking branching discussions.
+A revolutionary conversational AI application that breaks free from traditional linear chat interfaces. Create branching conversation trees, explore multiple dialogue paths, and visualize your conversations as interactive node graphs.
 
-This project implements a solution where each question-response pair is treated as a node, allowing the conversation to grow like a tree. In this model, users can ask multiple follow-up questions based on the same response, and easily navigate the resulting conversation graph.
+![Version](https://img.shields.io/badge/version-0.1.0--beta-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
+![Wasp](https://img.shields.io/badge/wasp-0.17.0-yellow)
 
-## Features
+## ✨ Features
 
--   **Split-screen interface**: Canvas visualization on the left, text chat on the right
--   **Node-based conversation tree**: Each user-assistant exchange forms a node in the tree
--   **Branch navigation**: Click any node to resume conversation from that point
--   **Multiple conversation paths**: Explore different directions from the same starting point
--   **Configurable chat settings**: Easily modify the prompt and initial message through a config file
--   **Multiple API providers**: Switch between different AI providers (OpenAI, Anthropic)
--   **Model selection**: Choose from various models for each provider
+### 🌿 Branching Conversations
 
-## Demo
+- Fork conversations at any point to explore different dialogue paths
+- Navigate between conversation branches seamlessly
+- Preserve context while exploring alternative responses
 
-![demo](./assets/gif/chatbot-demo.gif)
+### 📊 Interactive Visualization
 
-## Configuration
+- Real-time ReactFlow-powered conversation tree visualization
+- Drag-and-drop nodes to organize your conversation map
+- Resizable panels for optimal viewing experience
+- Visual path highlighting for active conversation threads
 
-### Chat Configuration
+### 🤖 AI Integration
 
-The chatbot's behavior can be configured by editing the `src/config/chatConfig.json` file:
+- Server-side OpenAI streaming for secure API key management
+- Support for multiple GPT-4o model variants
+- Real-time response streaming with queue-based NDJSON parsing
+- Configurable model selection through user-friendly settings
 
-```json
-{
-    "chatConfig": {
-        "prompt": "You are a helpful assistant. Your goal is to help the user with whatever queries they have.",
-        "initialMessage": "Hello! How can I help you today?"
-    }
-}
-```
+### 🎨 Modern UI/UX
 
--   **prompt**: The system instruction given to the AI
--   **initialMessage**: The first message displayed from the assistant
+- Clean, responsive Bootstrap-based design
+- Dark/light theme support with zero-flicker switching
+- Resizable panel layout with persistent state
 
-### API Configuration
+### 📤 Export & Sharing
 
-Users can configure their API settings through the user interface by clicking the "API Settings" button:
+- Export entire conversation trees as interactive HTML files
+- Preserve conversation structure and formatting
+- Standalone files that work offline
 
--   **Choose API Provider**: Select between different AI providers (OpenAI, Anthropic)
--   **Select Model**: Choose specific models from the selected provider
--   **Set API Key**: Enter your API key for authentication
+## 🚀 Getting Started
 
-API settings are saved in browser localStorage for convenience and security.
+### Prerequisites
 
-## How It Works
+- Node.js 22 or higher
+- PostgreSQL database
+- OpenAI API key
 
-1. The left side displays a visual tree of your conversation, with each node representing a user-assistant exchange
-2. The right side shows the active conversation thread where you interact with the AI
-3. To start a new branch from any point in the conversation:
-    - Click on a node in the canvas
-    - The text interface will update to show all messages up to that point
-    - Type your new question to branch from that point
-4. The tree structure automatically updates as you add new branches
+### Installation
 
-## Benefits
+1. **Clone the repository**
 
-This non-linear approach addresses two key issues:
+   ```bash
+   git clone https://github.com/WASD2HJKL/Non-Linear-Chatbot.git
+   cd Non-Linear-Chatbot
+   ```
 
-1. Users can easily revisit earlier parts of a conversation after following several branches
-2. Context is maintained efficiently, reducing computational overhead while preserving relevant information
+2. **Set up environment variables**
 
-## Installation
+   ```bash
+   cp .env.server.example .env.server
+   ```
+
+   Edit `.env.server` and add your configuration:
+
+   ```env
+   OPENAI_API_KEY=your_openai_api_key_here
+   # Optional: Google OAuth
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
+3. **Start the development server**
+
+   ```bash
+   wasp start
+   ```
+
+4. **Access the application**
+
+   Open http://localhost:3000 in your browser
+
+### Production Build
 
 ```bash
-# Install dependencies
-npm install reactflow react-bootstrap react-markdown react-spinners openai react-bootstrap-icons
-
-# Start the development server
-npm run dev
+wasp build
 ```
 
-## API Keys
+The build output will be in:
 
-To use this application, you'll need to provide your own API keys:
+- Frontend: `.wasp/build/web-app/`
+- Backend: `.wasp/build/server/`
 
--   **OpenAI API Key**: Get from [OpenAI Platform](https://platform.openai.com/)
--   **Anthropic API Key**: Get from [Anthropic Console](https://console.anthropic.com/)
+## 🏗️ Architecture
 
-The API keys are stored only in your browser's localStorage and are never sent to any server except the respective API provider's endpoints.
+### Project Structure
 
-## Implementation Details
+```
+Non-Linear-Chatbot/
+├── main.wasp              # Wasp configuration and routes
+├── schema.prisma          # Database schema
+├── src/
+│   ├── components/        # React components
+│   ├── contexts/          # React contexts (theme, etc.)
+│   ├── hooks/             # Custom React hooks
+│   ├── server/
+│   │   ├── actions/       # Server-side mutations
+│   │   ├── queries/       # Server-side queries
+│   │   ├── middleware/    # Express middleware
+│   │   └── openaiStream.ts # Streaming endpoint
+│   ├── services/          # Business logic services
+│   ├── styles/            # CSS files
+│   └── utils/             # Utility functions
+└── public/                # Static assets
+```
 
-The application consists of several key components:
+### Key Design Patterns
 
-1. **TextAppManager**: Orchestrates the overall application, managing the conversation tree and active branch
-2. **ConversationCanvas**: Visualizes the conversation tree using ReactFlow
-3. **ConversationNode**: Displays individual exchanges as nodes in the tree
-4. **TextApp**: Handles the actual conversation with the AI
-5. **Settings**: Manages API provider and model selection
-6. **apiClientService**: Handles API client creation and management for different providers
+- **Node-based conversation storage**: Each message pair is a node in the tree
+- **Centralized storage service**: Consistent localStorage handling with migration support
+- **Queue-based streaming**: Robust NDJSON parsing preventing data loss
+- **Component modularity**: Reusable UI components with clear separation of concerns
 
-The conversation structure is stored as a tree where:
+## 🌐 Deployment
 
--   Each branch contains a sequence of messages
--   Branches inherit context from their parent branches
--   New branches are created when continuing from a selected node
+### Backend (Heroku)
 
-## Layout Features
+The project includes Docker configuration for Heroku deployment:
 
--   **Auto Layout**: Automatically arrange nodes in a tree structure
--   **Drag and Drop**: Manually position nodes by dragging their handles
--   **Position Persistence**: Node positions are preserved between updates
--   **Expandable Nodes**: Expand nodes to view full content of long messages
+```bash
+heroku create your-app-name
+heroku addons:create --app your-app-name heroku-postgresql:mini # Optional, if you want to use Heroku Database
+                                                                # Otherwise you will have to set DATABASE_URL env
+heroku config:set --app your-app-name OPENAI_API_KEY=sk-xxx     # Do the same for other environment variables
+```
 
-## Usage
+### Frontend (Netlify)
 
-1. Set up your API key in the settings
-2. Start a conversation
-3. Ask follow-up questions as normal
-4. To explore a different direction:
-    - Click on any previous node in the canvas
-    - The conversation will reset to that point
-    - Type a new question to create a new branch
-5. Navigate between branches by clicking different nodes
-6. Try different AI models by changing settings
-7. Start a fresh conversation using the "New Chat" button
+To deploy the frontend build to Netlify, manually create a project
+at `Netlify` and set the GitHub Actions secrets, then run the pipeline.
 
----
+### GitHub Actions CI/CD
 
-This project demonstrates a more intuitive way to explore complex topics with AI assistants, allowing for non-linear learning and discovery.
+The repository includes automated deployment workflow that:
+
+- Builds and tests on push to main
+- Deploys backend to Heroku
+- Deploys frontend to Netlify
+
+Required GitHub Secrets:
+
+- `HEROKU_API_KEY`
+- `HEROKU_APP_NAME`
+- `NETLIFY_AUTH_TOKEN`
+- `NETLIFY_SITE_NAME`
+- `WASP_SERVER_URL`
+- `WASP_WEB_CLIENT_URL`
+
+## 🛠️ Development
+
+### Database Migrations
+
+```bash
+wasp db migrate-dev    # Apply migrations
+wasp db studio         # Open Prisma Studio
+```
+
+### Code Style
+
+The project uses Prettier for code formatting:
+
+- Tab width: 4 spaces
+- Print width: 120 characters
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'feat: add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Commit Convention
+
+This project follows conventional commits:
+
+- `feat:` New features
+- `fix:` Bug fixes
+- `docs:` Documentation changes
+- `style:` Code style changes
+- `refactor:` Code refactoring
+- `test:` Test additions/changes
+- `chore:` Build process or auxiliary tool changes
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Special thanks to Zhiyuan Shao (<shao.zhiyu@northeastern.edu>), who sparks the idea of mind map.
+
+## 📧 Contact
+
+Project Link: [https://github.com/HongzhengL/Non-Linear-LLM-Chat](https://github.com/HongzhengL/Non-Linear-LLM-Chat)

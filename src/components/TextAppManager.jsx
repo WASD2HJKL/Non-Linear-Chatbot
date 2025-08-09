@@ -1,211 +1,180 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "wasp/client/auth";
+import { useQuery } from "wasp/client/operations";
+import { getConversations, createConversation } from "../client/operations/conversations";
 import TextApp from "./TextApp";
 import ConversationCanvas from "./ConversationCanvas";
 import Settings from "./Settings";
-import { Container, Nav, NavItem, Row, Col, Button } from "react-bootstrap";
-import { Gear } from "react-bootstrap-icons";
+import LayoutContainer from "./layout/LayoutContainer";
+import Sidebar from "./layout/Sidebar";
+import ResizablePanelLayout from "./layout/ResizablePanelLayout";
+import { Spinner } from "react-bootstrap";
 import useStorage from "../hook/useStorage";
-import chatConfig from "../../config.json";
+import configService from "../services/configService";
 import apiClientService from "../services/apiClientService";
+import { LAYOUT_CONSTANTS } from "../constants/layoutConstants";
+import { useConversationNodes } from "../hooks/useConversationNodes";
+import { useNavigate } from "react-router-dom";
 
-export default function TextAppManager() {
-    // Store all conversation branches
-    const [conversationTree, setConversationTree] = useStorage(
-        "conversationTree",
-        {}
-    );
+export default function TextAppManager({ conversationId }) {
+    const navigate = useNavigate();
+    // Auth state
+    const { data: user, isLoading: isAuthLoading } = useAuth();
+    const { data: conversations, isLoading: conversationsLoading } = useQuery(getConversations);
 
-    // Track the currently active conversation branch
-    const [activeBranchId, setActiveBranchId] = useStorage(
-        "activeBranchId",
-        "root"
-    );
+    // Node-based state management
+    const {
+        nodes,
+        loading: nodesLoading,
+        error: nodesError,
+        activeNodeId,
+        createNode,
+        updatePositions,
+        updateWidths,
+        selectNode,
+        reconstructMessages,
+        hasNodes,
+        refresh,
+    } = useConversationNodes(conversationId);
 
-    // Messages for the current active branch
+    // Messages for the current active node
     const [currentMessages, setCurrentMessages] = useState([]);
 
     // Reset flag for TextApp
     const [resetFlag, setResetFlag] = useState(0);
 
-    // Store node positions so they're preserved between updates
-    const [nodePositions, setNodePositions] = useStorage("nodePositions", {});
+    // Track if active node change is from manual selection
+    const [manualSelection, setManualSelection] = useState(false);
 
     // Settings modal state
     const [showSettings, setShowSettings] = useState(false);
 
     // API configuration
     const [apiSettings, setApiSettings] = useState({
-        provider: chatConfig.apiConfig.defaultProvider,
-        model: chatConfig.apiConfig.defaultModel,
-        apiKey: "",
+        provider: configService.getApiConfig().defaultProvider,
+        model: configService.getApiConfig().defaultModel,
+        apiKey: "server-managed",
     });
 
     // Initialize API client and settings
     useEffect(() => {
+        const settings = apiClientService.init();
+        setApiSettings(settings);
+    }, []);
+
+    // Update current messages when active node changes
+    useEffect(() => {
         try {
-            const settings = apiClientService.init();
-            setApiSettings(settings);
-        } catch (error) {
-            console.error("Failed to initialize API client:", error);
-            // Show settings on first load if API key is missing
-            if (!localStorage.getItem("apiKey")) {
-                setShowSettings(true);
+            const messages = reconstructMessages();
+            setCurrentMessages(messages);
+
+            // Only increment resetFlag if this is a manual selection
+            if (manualSelection) {
+                setResetFlag((prev) => prev + 1);
+                setManualSelection(false);
             }
-        }
-    }, []);
-
-    // Initialize or reset the conversation tree
-    useEffect(() => {
-        if (Object.keys(conversationTree).length === 0) {
-            // Initialize with just the root branch containing config messages
-            const initialTree = {
-                root: {
-                    id: "root",
-                    parentId: null,
-                    messages: [
-                        {
-                            role: "developer",
-                            content: chatConfig.chatConfig.prompt,
-                        },
-                        {
-                            role: "assistant",
-                            content: chatConfig.chatConfig.initialMessage,
-                        },
-                    ],
-                    children: [],
-                },
-            };
-            setConversationTree(initialTree);
-            setActiveBranchId("root");
-            // Reset node positions
-            setNodePositions({ root: { x: 50, y: 50 } });
-        }
-    }, []);
-
-    // Load the active branch messages when active branch changes
-    useEffect(() => {
-        if (conversationTree[activeBranchId]) {
-            setCurrentMessages(conversationTree[activeBranchId].messages);
-        }
-    }, [activeBranchId, conversationTree]);
-
-    // Handle branch selection from canvas
-    const handleBranchSelect = (branchId) => {
-        setActiveBranchId(branchId);
-        // Increment resetFlag to tell TextApp to reload with the new messages
-        setResetFlag((prev) => prev + 1);
-    };
-
-    // Update node positions when they change in the canvas
-    const handleNodePositionChange = (nodeId, position) => {
-        setNodePositions((prev) => ({
-            ...prev,
-            [nodeId]: position,
-        }));
-    };
-
-    // Create a new branch when a new message pair is added
-    const handleNewMessagePair = (userMessage, assistantMessage) => {
-        // Create a new branch ID
-        const newBranchId = `branch-${Date.now()}`;
-
-        // Get current branch
-        const currentBranch = conversationTree[activeBranchId];
-
-        // Create a new branch with all messages from parent plus the new pair
-        const newBranch = {
-            id: newBranchId,
-            parentId: activeBranchId,
-            messages: [
-                ...currentBranch.messages,
+        } catch (error) {
+            console.error("Failed to reconstruct messages:", error);
+            // Fall back to config messages
+            const fallbackMessages = [
                 {
-                    role: "user",
-                    content: userMessage,
+                    role: "developer",
+                    content: configService.getChatConfig().prompt,
                 },
                 {
                     role: "assistant",
-                    content: assistantMessage,
+                    content: configService.getChatConfig().initialMessage,
                 },
-            ],
-            children: [],
-        };
+            ];
+            setCurrentMessages(fallbackMessages);
 
-        // Calculate position for the new node based on siblings
-        const parentPosition = nodePositions[activeBranchId] || { x: 0, y: 0 };
-        const siblingCount =
-            conversationTree[activeBranchId]?.children?.length || 0;
+            // Only increment resetFlag if this is a manual selection
+            if (manualSelection) {
+                setResetFlag((prev) => prev + 1);
+                setManualSelection(false);
+            }
+        }
+    }, [reconstructMessages, manualSelection]);
 
-        // Position the new node to the right and below based on number of siblings
-        const newPosition = {
-            x: parentPosition.x + 350, // Fixed horizontal spacing
-            y: parentPosition.y + siblingCount * 200, // Vertical positioning based on siblings
-        };
-
-        // Add the new branch to the tree
-        setConversationTree((prevTree) => {
-            // Add the new branch
-            const updatedTree = {
-                ...prevTree,
-                [newBranchId]: newBranch,
-            };
-
-            // Update parent's children array
-            updatedTree[activeBranchId] = {
-                ...updatedTree[activeBranchId],
-                children: [
-                    ...updatedTree[activeBranchId].children,
-                    newBranchId,
-                ],
-            };
-
-            return updatedTree;
-        });
-
-        // Store the position of the new node
-        setNodePositions((prev) => ({
-            ...prev,
-            [newBranchId]: newPosition,
-        }));
-
-        // Set the new branch as active
-        setActiveBranchId(newBranchId);
+    // Handle node selection from canvas
+    const handleNodeSelect = (nodeId) => {
+        setManualSelection(true);
+        selectNode(nodeId);
     };
 
-    // Function to reset the conversation
-    function handleNewChat() {
-        // Create a new conversation tree with just the root branch
-        const initialTree = {
-            root: {
-                id: "root",
-                parentId: null,
-                messages: [
-                    {
-                        role: "developer",
-                        content: chatConfig.chatConfig.prompt,
-                    },
-                    {
-                        role: "assistant",
-                        content: chatConfig.chatConfig.initialMessage,
-                    },
-                ],
-                children: [],
-            },
-        };
-        setConversationTree(initialTree);
-        setActiveBranchId("root");
-        // Reset node positions
-        setNodePositions({ root: { x: 50, y: 50 } });
-        setResetFlag((prev) => prev + 1);
-    }
+    // Handle node position updates from canvas (batch update)
+    const handleNodePositionUpdate = async (positionUpdates) => {
+        try {
+            await updatePositions(positionUpdates);
+        } catch (error) {
+            console.error("Failed to update node positions:", error);
+        }
+    };
+
+    // Handle node width updates from canvas (batch update)
+    const handleNodeWidthUpdate = async (widthUpdates) => {
+        try {
+            await updateWidths(widthUpdates);
+        } catch (error) {
+            console.error("Failed to update node widths:", error);
+        }
+    };
+
+    // Create a new node when a new message pair is added
+    const handleNewMessagePair = async (userMessage, assistantMessage) => {
+        if (!conversationId) {
+            console.error("No conversation ID available");
+            return;
+        }
+
+        try {
+            // Calculate position for the new node based on siblings
+            const parentNode = activeNodeId ? nodes.find((n) => n.id === activeNodeId) : null;
+            const parentPosition = parentNode ? { x: parentNode.x, y: parentNode.y } : { x: 50, y: 50 };
+
+            // Count existing children to position new node
+            const siblings = nodes.filter((n) => n.parentId === activeNodeId);
+            const siblingCount = siblings.length;
+
+            // Position the new node to the right and below based on number of siblings
+            const newPosition = {
+                x: parentPosition.x + 350, // Fixed horizontal spacing
+                y: parentPosition.y + siblingCount * 200, // Vertical positioning based on siblings
+            };
+
+            // Create the new node
+            await createNode({
+                parentId: activeNodeId, // This can be null for the first node
+                userMessage,
+                assistantMessage,
+                x: newPosition.x,
+                y: newPosition.y,
+            });
+        } catch (error) {
+            console.error("Failed to create node:", error);
+        }
+    };
+
+    // Handle new conversation creation
+    const handleNewChat = async () => {
+        try {
+            const newConversation = await createConversation({});
+            // Navigate to the new conversation
+            navigate(`/chat/${newConversation.id}`);
+        } catch (error) {
+            console.error("Failed to create conversation:", error);
+        }
+    };
+
+    // Handle back to conversations list
+    const handleBackToList = () => {
+        navigate("/");
+    };
 
     // Handle settings changes
     const handleApplySettings = (newSettings) => {
         try {
-            apiClientService.setClient(
-                newSettings.provider,
-                newSettings.model,
-                newSettings.apiKey
-            );
+            apiClientService.setClient(newSettings.provider, newSettings.model, newSettings.apiKey);
             setApiSettings(newSettings);
         } catch (error) {
             console.error("Failed to apply settings:", error);
@@ -213,62 +182,96 @@ export default function TextAppManager() {
         }
     };
 
-    return (
-        <Container fluid style={{ marginTop: "0.25rem" }}>
-            <Nav justify variant="tabs" className="mb-3">
-                <Nav.Item>
-                    <Nav.Link onClick={handleNewChat}>New Chat</Nav.Link>
-                </Nav.Item>
-                <Nav.Item className="ml-auto">
-                    <Button
-                        variant="outline-secondary"
-                        onClick={() => setShowSettings(true)}
-                        title="API Settings"
-                    >
-                        <Gear /> API Settings
-                    </Button>
-                </Nav.Item>
-            </Nav>
-
-            <Row>
-                {/* Conversation Canvas for visualization and navigation */}
-                <Col md={6} className="mb-3">
-                    <h5>Conversation Map</h5>
-                    <div style={{ height: "70vh", border: "1px solid #ccc" }}>
-                        <ConversationCanvas
-                            conversationTree={conversationTree}
-                            activeBranchId={activeBranchId}
-                            nodePositions={nodePositions}
-                            onBranchSelect={handleBranchSelect}
-                            onNodePositionChange={handleNodePositionChange}
-                        />
+    // Show loading spinner while auth or nodes are loading
+    if (isAuthLoading || nodesLoading) {
+        return (
+            <LayoutContainer>
+                <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                    <div className="text-center">
+                        <Spinner animation="border" role="status" />
+                        <div className="mt-2">Loading...</div>
                     </div>
-                </Col>
+                </div>
+            </LayoutContainer>
+        );
+    }
 
-                {/* TextApp for the actual conversation */}
-                <Col md={6}>
-                    <h5>
+    // This should not happen due to authRequired: true, but just in case
+    if (!user) {
+        return (
+            <LayoutContainer>
+                <div className="d-flex justify-content-center align-items-center h-100">
+                    <div className="text-center">
+                        <p>Please log in to access the chatbot.</p>
+                    </div>
+                </div>
+            </LayoutContainer>
+        );
+    }
+
+    // Show error if nodes failed to load
+    if (nodesError) {
+        return (
+            <LayoutContainer>
+                <div className="d-flex justify-content-center align-items-center h-100">
+                    <div className="text-center">
+                        <p className="text-danger">Failed to load conversation: {nodesError}</p>
+                        <button className="btn btn-primary mt-2" onClick={handleNewChat}>
+                            Start New Conversation
+                        </button>
+                    </div>
+                </div>
+            </LayoutContainer>
+        );
+    }
+
+    return (
+        <LayoutContainer>
+            <Sidebar
+                user={user}
+                onNewChat={handleNewChat}
+                onShowSettings={() => setShowSettings(true)}
+                onBackToList={handleBackToList}
+            />
+
+            <ResizablePanelLayout
+                leftTitle="Conversation Map"
+                rightTitle={
+                    <span>
                         Active Conversation
                         <small className="text-muted ms-2">
                             {apiSettings.provider}: {apiSettings.model}
                         </small>
-                    </h5>
+                    </span>
+                }
+                leftPanel={
+                    <ConversationCanvas
+                        nodes={nodes}
+                        activeNodeId={activeNodeId}
+                        onNodeSelect={handleNodeSelect}
+                        onNodePositionUpdate={handleNodePositionUpdate}
+                        onNodeWidthUpdate={handleNodeWidthUpdate}
+                        onRefresh={refresh}
+                    />
+                }
+                rightPanel={
                     <TextApp
                         resetFlag={resetFlag}
                         initialMessages={currentMessages}
                         onNewMessagePair={handleNewMessagePair}
-                        config={chatConfig.chatConfig}
+                        config={configService.getChatConfig()}
                         apiSettings={apiSettings}
+                        conversationId={conversationId}
                     />
-                </Col>
-            </Row>
+                }
+                leftDefaultSize={LAYOUT_CONSTANTS.PANEL_DEFAULT_SIZE}
+                rightDefaultSize={LAYOUT_CONSTANTS.PANEL_DEFAULT_SIZE}
+                minSize={LAYOUT_CONSTANTS.PANEL_MIN_SIZE}
+                autoSaveId="main-panels"
+            />
 
             {/* Settings Modal */}
-            <Settings
-                show={showSettings}
-                onHide={() => setShowSettings(false)}
-                onApply={handleApplySettings}
-            />
-        </Container>
+            <Settings show={showSettings} onHide={() => setShowSettings(false)} onApply={handleApplySettings} />
+        </LayoutContainer>
     );
 }

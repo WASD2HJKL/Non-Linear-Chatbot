@@ -1,0 +1,163 @@
+/* Resizable Panel Layout Styles */
+.container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: var(--background-color);
+}
+
+.panelGroup {
+    flex-grow: 1;
+    display: flex;
+    height: 100%;
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0; /* Prevent flex items from overflowing */
+}
+
+.panelContent {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--spacing-sm);
+}
+
+.panelTitle {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.panelBody {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0; /* Prevent overflow */
+}
+
+/* Resize Handle Styles */
+.resizeHandle {
+    background-color: var(--resize-handle-color);
+    cursor: ew-resize;
+    position: relative;
+    transition: background-color var(--transition-duration) ease;
+    z-index: 1;
+}
+
+.resizeHandle:hover {
+    background-color: var(--resize-handle-hover-color);
+}
+
+.resizeHandle:active {
+    background-color: var(--primary-color);
+}
+
+/* Add visual feedback for resize handle */
+.resizeHandle::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 20px;
+    background-color: transparent;
+    border-left: 1px dotted var(--border-color-dark);
+    border-right: 1px dotted var(--border-color-dark);
+    opacity: 0;
+    transition: opacity var(--transition-duration) ease;
+}
+
+.resizeHandle:hover::before {
+    opacity: 1;
+}
+
+/* Panel-specific content styles */
+.panel [data-react-flow-wrapper] {
+    height: 100% !important;
+}
+
+.panel .app {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--background-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .panelContent {
+        padding: var(--spacing-xs);
+    }
+
+    .panelTitle {
+        font-size: 1.1rem;
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .resizeHandle {
+        width: 8px; /* Wider handle for touch devices */
+    }
+}
+
+@media (max-width: 576px) {
+    .panelGroup {
+        flex-direction: column;
+    }
+
+    .resizeHandle {
+        width: 100%;
+        height: 8px;
+        cursor: ns-resize;
+    }
+
+    .resizeHandle::before {
+        width: 20px;
+        height: 3px;
+        border-left: none;
+        border-right: none;
+        border-top: 1px dotted var(--border-color-dark);
+        border-bottom: 1px dotted var(--border-color-dark);
+    }
+}
+
+/* Theme-specific adjustments */
+[data-theme="dark"] .panelTitle {
+    color: var(--text-color);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .panel .app {
+    border-color: var(--border-color);
+    background-color: var(--background-color-secondary);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .resizeHandle {
+        border: 1px solid var(--text-color);
+    }
+
+    .panelTitle {
+        border-bottom-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .resizeHandle,
+    .resizeHandle::before {
+        transition: none;
+    }
+}

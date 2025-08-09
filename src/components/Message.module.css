@@ -1,0 +1,47 @@
+/*
+ * Message.module.css
+ * 
+ * Table styling for chat interface messages with scroll indicators
+ * and theme integration for markdown table support.
+ */
+
+/* Chat interface table styling */
+.markdownContent table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: inherit;
+    margin: 8px 0;
+}
+
+.markdownContent .tableContainer {
+    position: relative;
+    overflow-x: auto;
+    width: 100%;
+    /* Gradient scroll indicators */
+    background:
+        linear-gradient(90deg, var(--background-color) 30%, transparent),
+        linear-gradient(90deg, transparent, var(--background-color) 70%) 100% 0;
+    background-repeat: no-repeat;
+    background-size:
+        20px 100%,
+        20px 100%;
+    background-attachment: local, local;
+}
+
+.markdownContent th,
+.markdownContent td {
+    border: 1px solid var(--border-color);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.markdownContent th {
+    background-color: var(--background-color-secondary);
+    font-weight: bold;
+}
+
+/* Base wrapper for all react-markdown content within Message */
+.markdownContent {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}

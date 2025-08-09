@@ -1,11 +1,17 @@
+/* Import theme system */
+@import "./styles/variables.css";
+@import "./styles/themes.css";
+
 .app {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    border: 1px solid #ccc;
-    height: 70vh;
+    border: 1px solid var(--border-color);
+    height: 100%;
     display: flex;
     flex-direction: column;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
 .inline-form {
@@ -16,40 +22,59 @@
 .message-list {
     overflow-y: auto;
     overflow-x: hidden;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     margin-bottom: 10px;
     padding: 10px;
-    background-color: #f9f9f9;
+    background-color: var(--chat-message-list-bg);
     flex-grow: 1;
     min-width: 250px;
 }
 
 .user-message {
-    background-color: white;
+    background-color: var(--chat-user-message-bg);
     padding: 8px 8px 0 8px;
     margin-right: 0.5rem;
-    border-radius: 10px;
+    border-radius: var(--border-radius-lg);
     float: right;
     margin-left: auto;
     overflow-wrap: break-word;
     text-align: right;
+    color: var(--chat-user-message-text);
+    border: 1px solid var(--chat-user-message-border);
 }
 
 .assistant-message {
-    background-color: lightblue;
+    background-color: var(--chat-assistant-message-bg);
     padding: 8px 8px 0 8px;
     margin-left: 0.5rem;
-    border-radius: 10px;
+    border-radius: var(--border-radius-lg);
     float: left;
     margin-right: auto;
     overflow-wrap: break-word;
     text-align: left;
+    color: var(--chat-assistant-message-text);
+    border: 1px solid var(--chat-assistant-message-border);
 }
 
 .input-area {
     display: flex;
     justify-content: space-between;
+    align-items: end;
     padding: 10px 0;
+}
+
+textarea.form-control {
+    resize: none;
+    max-height: 300px;
+    overflow-y: auto;
+    min-height: 38px;
+}
+
+.keyboard-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted-color, #6c757d);
+    margin-top: 0.25rem;
+    text-align: center;
 }
 
 /* ReactFlow Specific Styles */
@@ -69,33 +94,62 @@
 }
 
 .auto-layout-button {
-    background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
     padding: 5px 10px;
     font-size: 12px;
     cursor: pointer;
     z-index: 10;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--box-shadow);
+    color: var(--text-color);
+    transition: background-color 150ms ease;
 }
 
 .auto-layout-button:hover {
-    background-color: #f0f0f0;
+    background-color: var(--background-color-secondary);
 }
 
 .react-flow__node {
     cursor: pointer;
 }
 
+/* Base ReactFlow node styling */
 .react-flow__node-conversationNode {
     font-size: 12px;
-    border-radius: 5px;
-    background: white;
-    border: 1px solid #777;
+    border-radius: var(--border-radius);
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    transition: background-color 150ms ease;
+}
+
+/* Light theme ReactFlow nodes */
+[data-theme="light"] .react-flow__node-conversationNode {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+}
+
+/* Dark theme ReactFlow nodes */
+[data-theme="dark"] .react-flow__node-conversationNode {
+    background: #1e293b;
+    color: #f8fafc;
+    border: 1px solid #64748b;
+}
+
+/* Light theme hover */
+[data-theme="light"] .react-flow__node-conversationNode:hover {
+    background: #f8fafc;
+}
+
+/* Dark theme hover */
+[data-theme="dark"] .react-flow__node-conversationNode:hover {
+    background: #334155;
 }
 
 .react-flow__node.selected {
-    box-shadow: 0 0 0 2px #ff6060;
+    box-shadow: 0 0 0 2px var(--primary-color);
 }
 
 .react-flow__edge-path {
@@ -117,7 +171,7 @@
 .react-flow__handle {
     width: 8px;
     height: 8px;
-    background-color: #0096FF;
+    background-color: var(--primary-color);
 }
 
 .react-flow__attribution {
@@ -130,4 +184,24 @@
 
 .drag-handle:hover {
     opacity: 1;
+}
+
+.sidebar {
+    transition: width 0.3s ease;
+}
+
+.sidebar-collapsed {
+    width: 60px !important;
+}
+
+.sidebar-btn {
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-collapsed .btn-text {
+    display: none;
+}
+
+.react-resizable-handle:hover {
+    background-color: var(--resize-handle-hover-color);
 }

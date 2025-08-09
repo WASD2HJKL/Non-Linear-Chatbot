@@ -1,0 +1,147 @@
+/* Sidebar Component Styles */
+.sidebar {
+    background-color: var(--sidebar-background);
+    border-right: 1px solid var(--sidebar-border);
+    padding: var(--spacing-md) var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    color: var(--sidebar-text);
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+/* Sidebar Sections */
+.topSection {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.userWelcome {
+    margin: var(--spacing-lg) 0;
+    font-size: 0.875rem;
+    color: var(--sidebar-text-muted);
+    line-height: 1.4;
+    padding: var(--spacing-sm);
+    background-color: var(--background-color-tertiary);
+    border-radius: var(--border-radius-sm);
+}
+
+.bottomSection {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* Button Styles */
+.button {
+    width: 100%;
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    color: var(--text-color);
+    transition: all var(--transition-duration) ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--spacing-xs);
+    min-height: 38px;
+}
+
+.button:hover {
+    background-color: var(--background-color-tertiary);
+    border-color: var(--border-color-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--box-shadow-sm);
+}
+
+.button:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color), 0.25);
+}
+
+.button:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+/* Toggle Button Specific */
+.toggleButton {
+    border-color: var(--secondary-color);
+}
+
+.toggleButton:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+    color: white;
+}
+
+/* Collapsed State */
+.collapsed {
+    padding: var(--spacing-md) var(--spacing-xs);
+}
+
+.collapsed .button {
+    justify-content: center;
+    padding: var(--spacing-sm);
+    min-width: 44px;
+}
+
+.collapsed .userWelcome {
+    display: none;
+}
+
+/* Icon only buttons in collapsed state */
+.collapsed .button svg {
+    margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        width: var(--sidebar-width-collapsed) !important;
+        padding: var(--spacing-sm) var(--spacing-xs);
+    }
+
+    .userWelcome {
+        display: none;
+    }
+
+    .button {
+        justify-content: center;
+        padding: var(--spacing-sm);
+    }
+
+    .button span:not(.visually-hidden) {
+        display: none;
+    }
+}
+
+/* Theme-specific adjustments */
+[data-theme="dark"] .button {
+    background-color: var(--background-color-secondary);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .button:hover {
+    background-color: var(--background-color-tertiary);
+    border-color: var(--border-color-light);
+}
+
+/* Accessibility */
+.button:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .button {
+        transition: none;
+    }
+}

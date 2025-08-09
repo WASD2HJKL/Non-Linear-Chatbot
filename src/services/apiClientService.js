@@ -1,80 +1,36 @@
-import OpenAI from "openai";
-import chatConfig from "../../config.json";
+import configService from "./configService";
+import { getSessionId } from "wasp/client/api";
+import storageService from "../utils/storageService";
 
 // API Client Factory
 class ApiClientService {
     constructor() {
-        this.apiClients = {};
         this.currentProvider = null;
         this.currentModel = null;
     }
 
     // Initialize the service with saved preferences or defaults
     init() {
-        // Get saved preferences or use defaults
-        const provider =
-            localStorage.getItem("provider") ||
-            chatConfig.apiConfig.defaultProvider;
-        const model =
-            localStorage.getItem("model") || chatConfig.apiConfig.defaultModel;
-        const apiKey = localStorage.getItem("apiKey") || "";
-
-        this.setClient(provider, model, apiKey);
-
-        return {
-            provider,
-            model,
-            apiKey,
-        };
-    }
-
-    // Create and set a client for the specified provider
-    setClient(provider, model, apiKey) {
-        if (!apiKey) {
-            console.error("API key is required");
-            throw new Error("API key is required");
-        }
+        const provider = storageService.getItem("provider", configService.getApiConfig().defaultProvider);
+        const model = storageService.getItem("model", configService.getApiConfig().defaultModel);
 
         this.currentProvider = provider;
         this.currentModel = model;
 
-        // Create a client if it doesn't exist for this provider
-        if (!this.apiClients[provider]) {
-            switch (provider) {
-                case "openai":
-                    this.apiClients[provider] = new OpenAI({
-                        apiKey,
-                        dangerouslyAllowBrowser: true,
-                    });
-                    break;
-
-                case "anthropic":
-                    // Would use Anthropic client here if available
-                    console.warn("Anthropic API support is simulated");
-                    this.apiClients[provider] = {
-                        async chatCompletions(options) {
-                            // This is a placeholder implementation
-                            throw new Error(
-                                "Anthropic API is not fully implemented in this demo",
-                            );
-                        },
-                    };
-                    break;
-
-                default:
-                    throw new Error(`Unsupported provider: ${provider}`);
-            }
-        }
-
-        return this.apiClients[provider];
+        return {
+            provider,
+            model,
+            apiKey: "server-managed",
+        };
     }
 
-    // Get the current client
-    getClient() {
-        if (!this.currentProvider || !this.apiClients[this.currentProvider]) {
-            throw new Error("API client not initialized");
-        }
-        return this.apiClients[this.currentProvider];
+    // Create and set a client for the specified provider
+    setClient(provider, model, _apiKey) {
+        this.currentProvider = provider;
+        this.currentModel = model;
+
+        storageService.setItem("provider", provider);
+        storageService.setItem("model", model);
     }
 
     // Get the current model
@@ -84,32 +40,194 @@ class ApiClientService {
 
     // Create chat completion with the current client and model
     async createChatCompletion(messages, options = {}) {
-        const client = this.getClient();
-        const model = this.getModel();
+        // All providers now go through the server-side API
+        // Server handles provider-specific implementations
 
-        // Handle different APIs with a common interface
-        switch (this.currentProvider) {
-            case "openai":
-                return client.chat.completions.create({
-                    model,
-                    messages,
-                    stream: true,
-                    ...options,
-                });
+        // Filter out empty messages (like placeholder assistant messages)
+        const filteredMessages = messages.filter((msg) => msg.content && msg.content.trim().length > 0);
 
-            case "anthropic":
-                // This would use the Anthropic client implementation
-                return client.chatCompletions({
-                    model,
-                    messages,
-                    ...options,
-                });
+        // Get the session ID for authentication
+        const sessionId = getSessionId();
+        const headers = {
+            "Content-Type": "application/json",
+        };
 
-            default:
-                throw new Error(
-                    `Unsupported provider: ${this.currentProvider}`,
-                );
+        // Add Authorization header if we have a session ID
+        if (sessionId) {
+            headers["Authorization"] = `Bearer ${sessionId}`;
         }
+
+        const apiBaseUrl = import.meta.env.REACT_APP_API_URL || "";
+        const response = await fetch(`${apiBaseUrl}/api/openai/stream`, {
+            method: "POST",
+            headers,
+            credentials: "include", // Include cookies as backup
+            body: JSON.stringify({
+                messages: filteredMessages,
+                conversationId: options.conversationId || undefined,
+                model: this.currentModel,
+            }),
+        });
+
+        if (!response.ok) {
+            let errorMessage = `HTTP ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch (parseError) {
+                // If we can't parse JSON, use the response text
+                try {
+                    errorMessage = (await response.text()) || errorMessage;
+                } catch (textError) {
+                    // If we can't get text either, use the status
+                    errorMessage = `HTTP ${response.status} - ${response.statusText}`;
+                }
+            }
+            throw new Error(errorMessage);
+        }
+
+        if (!response.body) {
+            throw new Error("No response body received from server");
+        }
+
+        return this.createSimpleAsyncIterator(response.body);
+    }
+
+    /**
+     * Queue-based async iterator for NDJSON streaming
+     *
+     * Fixes critical data loss bug where multiple NDJSON lines in a single
+     * network packet would cause all but the first line to be discarded.
+     *
+     * Key features:
+     * - Queue-first serving: Always check queue before network reads
+     * - Bulk parsing: Process ALL lines from network chunks
+     * - UTF-8 safe: Handles split multibyte characters correctly
+     * - Memory efficient: O(lines in flight) not O(total lines)
+     * - Error resilient: Malformed lines don't break the stream
+     *
+     * @param {ReadableStream} body - Response body stream from fetch()
+     * @returns {AsyncIterator} Iterator yielding OpenAI-compatible delta objects
+     */
+    createSimpleAsyncIterator(body) {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const lineQueue = []; // Queue to store parsed NDJSON objects from multi-line packets
+
+        return {
+            [Symbol.asyncIterator]() {
+                return this;
+            },
+
+            async next() {
+                try {
+                    // Queue-first: serve buffered lines before reading network
+                    if (lineQueue.length > 0) {
+                        const queuedData = lineQueue.shift();
+                        return {
+                            value: {
+                                choices: [
+                                    {
+                                        delta: { content: queuedData.delta },
+                                    },
+                                ],
+                            },
+                            done: false,
+                        };
+                    }
+
+                    // Network read loop: bulk-parse and queue all lines
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            // Process any remaining buffer content before closing
+                            if (buffer.trim()) {
+                                try {
+                                    const data = JSON.parse(buffer);
+                                    if (data && typeof data.delta !== "undefined") {
+                                        lineQueue.push(data);
+                                    }
+                                } catch (err) {
+                                    console.warn("Invalid final NDJSON line:", { line: buffer, error: err.message });
+                                }
+                            }
+                            reader.releaseLock();
+                            return { done: true };
+                        }
+
+                        // Safe UTF-8 handling with stream:true for partial multibyte chars
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Buffer size protection - prevent memory exhaustion attacks
+                        if (buffer.length > 1048576) {
+                            // 1MB limit
+                            reader.releaseLock();
+                            throw new Error("Buffer size exceeded 1MB limit - possible malicious stream");
+                        }
+
+                        const lines = buffer.split("\n");
+                        buffer = lines.pop() ?? ""; // Keep partial line for next chunk
+
+                        // Bulk parse: process ALL lines in this network chunk
+                        const parseStart = performance.now();
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    const data = JSON.parse(line);
+                                    // Validate expected structure before queuing
+                                    if (data && typeof data.delta !== "undefined") {
+                                        lineQueue.push(data);
+                                    } else {
+                                        console.warn("NDJSON line missing delta field:", line);
+                                    }
+                                } catch (err) {
+                                    console.warn("Invalid NDJSON line:", { line, error: err.message });
+                                }
+                            }
+                        }
+
+                        // Performance monitoring for unusual parsing times
+                        const parseTime = performance.now() - parseStart;
+                        if (parseTime > 10) {
+                            console.debug("Slow NDJSON parse:", {
+                                lines: lines.length,
+                                time: parseTime.toFixed(2) + "ms",
+                                queueSize: lineQueue.length,
+                            });
+                        }
+
+                        // Memory safety: warn about unusually large queues
+                        if (lineQueue.length > 100) {
+                            console.warn("Large line queue detected:", {
+                                queueSize: lineQueue.length,
+                                suggestion: "Check for slow consumer or high-volume stream",
+                            });
+                        }
+
+                        // Return first queued line if any were parsed
+                        if (lineQueue.length > 0) {
+                            const firstData = lineQueue.shift();
+                            return {
+                                value: {
+                                    choices: [
+                                        {
+                                            delta: { content: firstData.delta },
+                                        },
+                                    ],
+                                },
+                                done: false,
+                            };
+                        }
+                        // Continue reading if no valid lines in this chunk
+                    }
+                } catch (error) {
+                    console.error("Error in stream iterator:", error);
+                    reader.releaseLock();
+                    throw error;
+                }
+            },
+        };
     }
 }
 
