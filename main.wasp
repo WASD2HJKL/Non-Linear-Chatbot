@@ -1,0 +1,141 @@
+app NonLinearChatbot {
+  wasp: {
+    version: "^0.17.0"
+  },
+  title: "Non-Linear-Chatbot",
+  client: {},
+  head: [
+    "<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\" />",
+  ],
+  auth: {
+    userEntity: User,
+    methods: {
+      email: {
+        fromField: {
+          name: "Non-Linear Chatbot",
+          email: "noreply@nonlinearchatbot.com"
+        },
+        emailVerification: {
+          clientRoute: EmailVerificationRoute,
+        },
+        passwordReset: {
+          clientRoute: PasswordResetRoute,
+        },
+        userSignupFields: import { userSignupFields } from "@src/auth/signup"
+      },
+      google: {
+        userSignupFields: import { userSignupFields } from "@src/auth/google",
+        configFn: import { config } from "@src/auth/google"
+      }
+    },
+    onAuthFailedRedirectTo: "/login",
+    onAuthSucceededRedirectTo: "/"
+  },
+  emailSender: {
+    provider: SMTP,
+    defaultFrom: {
+      name: "Non-Linear Chatbot",
+      email: "noreply@nonlinearchatbot.com"
+    }
+  }
+}
+
+route RootRoute { path: "/", to: HomeRouter }
+page HomeRouter {
+  component: import { HomeRouter } from "@src/pages/HomeRouter",
+  authRequired: false
+}
+
+route ChatRoute { path: "/chat/:conversationId", to: ChatPage }
+page ChatPage {
+  component: import { ChatPage } from "@src/pages/ChatPage",
+  authRequired: true
+}
+
+route NewChatRoute { path: "/new", to: NewChatPage }
+page NewChatPage {
+  component: import { NewChatPage } from "@src/pages/NewChatPage",
+  authRequired: true
+}
+
+route LoginRoute { path: "/login", to: LoginPage }
+page LoginPage {
+  component: import { LoginPage } from "@src/pages/LoginPage.jsx",
+  authRequired: false
+}
+
+route SignupRoute { path: "/signup", to: SignupPage }
+page SignupPage {
+  component: import { SignupPage } from "@src/pages/SignupPage.jsx",
+  authRequired: false
+}
+
+route EmailVerificationRoute { path: "/email-verification", to: EmailVerificationPage }
+page EmailVerificationPage {
+  component: import { EmailVerificationPage } from "@src/pages/EmailVerificationPage.jsx",
+  authRequired: false
+}
+
+route PasswordResetRoute { path: "/password-reset", to: PasswordResetPage }
+page PasswordResetPage {
+  component: import { PasswordResetPage } from "@src/pages/PasswordResetPage.jsx",
+  authRequired: false
+}
+
+api openaiStream {
+  fn: import { openaiStream } from "@src/server/openaiStream",
+  httpRoute: (ALL, "/api/openai/stream"),
+  middlewareConfigFn: import { configureMiddleware } from "@src/server/openaiStream",
+  auth: true
+}
+
+action createConversation {
+  fn: import { createConversation } from "@src/server/actions/conversations",
+  entities: [User, Conversation]
+}
+
+
+query getConversations {
+  fn: import { getConversations } from "@src/server/queries/conversations",
+  entities: [User, Conversation, Node]
+}
+
+query getConversation {
+  fn: import { getConversation } from "@src/server/queries/conversations",
+  entities: [User, Conversation, Node] 
+}
+
+action createNode {
+  fn: import { createNode } from "@src/server/actions/nodes",
+  entities: [User, Conversation, Node]
+}
+
+action updateNodePositions {
+  fn: import { updateNodePositions } from "@src/server/actions/nodes",
+  entities: [User, Node]
+}
+
+action updateNodeWidth {
+  fn: import { updateNodeWidth } from "@src/server/actions/nodes",
+  entities: [User, Node]
+}
+
+action updateNodeExpanded {
+  fn: import { updateNodeExpanded } from "@src/server/actions/nodes",
+  entities: [User, Node]
+}
+
+action updateNodePinned {
+  fn: import { updateNodePinned } from "@src/server/actions/nodes",
+  entities: [User, Node]
+}
+
+action updateLastActiveNodeId {
+  fn: import { updateLastActiveNodeId } from "@src/server/actions/conversations",
+  entities: [Conversation, Node]
+}
+
+query getConversationNodes {
+  fn: import { getConversationNodes } from "@src/server/queries/nodes",
+  entities: [User, Conversation, Node]
+}

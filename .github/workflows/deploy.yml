@@ -1,0 +1,57 @@
+name: Deploy to Netlify and Heroku
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v2
+
+            - name: Setup Node.js
+              id: setup-node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
+            - name: Install Wasp
+              run: |
+                  curl -sSL https://get.wasp.sh/installer.sh | sh -s -- -v 0.17.0
+                  export PATH=$PATH:$HOME/.local/bin
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+            - name: Install Heroku CLI
+              run: curl https://cli-assets.heroku.com/install.sh | sh
+
+            - name: Wasp Build
+              run: wasp build
+
+            - name: Install dependencies and build the client
+              run: |
+                  cd ./.wasp/build/web-app
+                  npm install
+                  REACT_APP_API_URL=${{ secrets.WASP_SERVER_URL }} npm run build
+
+            - name: Deploy to Heroku
+              run: |
+                  heroku container:login
+                  heroku stack:set container --app ${{ secrets.HEROKU_APP_NAME }}
+                  cd ./.wasp/build
+                  docker build . -t ${{ secrets.HEROKU_APP_NAME }}
+                  heroku container:push --app ${{ secrets.HEROKU_APP_NAME }} web
+                  heroku container:release --app ${{ secrets.HEROKU_APP_NAME }} web
+
+            - name: Deploy to Netlify
+              run: |
+                  cd ./.wasp/build/web-app
+                  npx netlify-cli@17.36.1 deploy --prod --dir=build --auth=$NETLIFY_AUTH_TOKEN --site=$NETLIFY_SITE_NAME
+
+        env:
+            HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+            NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+            NETLIFY_SITE_NAME: ${{ secrets.NETLIFY_SITE_NAME }}

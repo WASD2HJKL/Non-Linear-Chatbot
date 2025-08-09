@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Node" ADD COLUMN     "width" INTEGER NOT NULL DEFAULT 250;

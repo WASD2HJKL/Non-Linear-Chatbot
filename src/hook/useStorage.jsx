@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
+import storageService from "../utils/storageService";
 
 export default function useStorage(storageKey, initialValue) {
-    const savedData = JSON.parse(localStorage.getItem(storageKey));
+    const savedData = storageService.getItem(storageKey, null);
 
-    const [data, setData] = useState(savedData ? savedData : initialValue);
+    const [data, setData] = useState(savedData !== null ? savedData : initialValue);
 
     useEffect(() => {
-        localStorage.setItem(storageKey, JSON.stringify(data));
+        storageService.setItem(storageKey, data);
     }, [storageKey, data]);
 
     return [data, setData];

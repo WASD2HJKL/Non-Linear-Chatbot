@@ -1,34 +1,79 @@
-import React, { memo, useState } from "react";
-import { Handle, Position } from "reactflow";
+import React, { memo, useState, useEffect } from "react";
+import { Handle, Position, NodeResizer } from "reactflow";
 import { Button } from "react-bootstrap";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import styles from "./ConversationNode.module.css";
+import CodeModal from "./CodeModal";
+import { detectCodeBlocks, extractCodeContent } from "../utils/codeBlockDetector";
+import { updateNodeExpanded } from "wasp/client/operations";
 
 function ConversationNode({ data, isConnectable }) {
-    const { question, answer, isSelected, onClick } = data;
-    const [expanded, setExpanded] = useState(false);
+    const {
+        question,
+        answer,
+        summary,
+        isSelected,
+        onClick,
+        onWidthChange,
+        onExpandedChange,
+        width = 250,
+        expanded: initialExpanded = false,
+        nodeId,
+        measureRef,
+    } = data;
+    const [expanded, setExpanded] = useState(initialExpanded);
+    const [showCodeModal, setShowCodeModal] = useState(false);
+    const [codeData, setCodeData] = useState({ hasCodeBlocks: false, codeBlocks: [] });
 
-    // Node styling
+    // Detect code blocks when content changes
+    useEffect(() => {
+        const detectCode = () => {
+            try {
+                // Combine question and answer for code detection
+                const allContent = [question, answer].filter(Boolean).join("\n\n");
+
+                if (!allContent) {
+                    setCodeData({ hasCodeBlocks: false, codeBlocks: [] });
+                    return;
+                }
+
+                const detection = detectCodeBlocks(allContent);
+                const formattedBlocks = extractCodeContent(detection.codeBlocks);
+
+                setCodeData({
+                    hasCodeBlocks: detection.hasCodeBlocks,
+                    codeBlocks: formattedBlocks,
+                });
+            } catch (error) {
+                console.error("Error detecting code blocks:", error);
+                setCodeData({ hasCodeBlocks: false, codeBlocks: [] });
+            }
+        };
+
+        detectCode();
+    }, [question, answer]);
+
+    // Node styling with dynamic width
     const nodeStyle = {
         padding: "10px",
         borderRadius: "8px",
-        width: "250px",
-        background: isSelected ? "#d2f5ff" : "white",
-        border: isSelected ? "2px solid #0096FF" : "1px solid #ccc",
-        boxShadow: isSelected
-            ? "0 0 10px rgba(0, 150, 255, 0.5)"
-            : "0 4px 6px rgba(0, 0, 0, 0.1)",
+        width: `${width}px`,
+        background: isSelected ? "var(--node-background-selected)" : "var(--node-background)",
+        border: isSelected ? "2px solid var(--node-border-selected)" : "1px solid var(--node-border)",
+        boxShadow: isSelected ? "0 0 10px var(--node-shadow-selected)" : "0 4px 6px var(--node-shadow)",
         cursor: "pointer",
         transition: "all 0.3s ease",
         fontSize: "14px",
-        overflow: "hidden",
+        overflowY: "hidden",
+        overflowX: "visible",
         position: "relative",
     };
 
     // Truncate text longer than a certain length
     const truncateText = (text, maxLength = 50) => {
         if (!text) return "";
-        return text.length > maxLength
-            ? text.substring(0, maxLength) + "..."
-            : text;
+        return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
     };
 
     // Handle clicks on the node
@@ -38,13 +83,38 @@ function ConversationNode({ data, isConnectable }) {
     };
 
     // Toggle expanded state for the node
-    const toggleExpand = (e) => {
+    const toggleExpand = async (e) => {
         e.stopPropagation();
-        setExpanded(!expanded);
+        const newExpanded = !expanded;
+        setExpanded(newExpanded);
+
+        try {
+            if (onExpandedChange) {
+                await onExpandedChange(nodeId, newExpanded);
+            }
+        } catch (error) {
+            console.error("Failed to update expanded state:", error);
+            // Revert local state on error
+            setExpanded(expanded);
+        }
+    };
+
+    // Open code modal
+    const handleViewCode = (e) => {
+        e.stopPropagation();
+        setShowCodeModal(true);
+    };
+
+    // Handle node resize end (only update on resize completion)
+    const handleResizeEnd = (event, params) => {
+        if (onWidthChange && params.width) {
+            onWidthChange(params.width);
+        }
     };
 
     return (
-        <div style={nodeStyle} onClick={handleNodeClick}>
+        <div ref={measureRef ? measureRef(nodeId) : null} style={nodeStyle} onClick={handleNodeClick}>
+            <NodeResizer minWidth={150} maxWidth={800} onResizeEnd={handleResizeEnd} isVisible={isSelected} />
             {/* Drag handle */}
             <div
                 className="drag-handle"
@@ -54,7 +124,7 @@ function ConversationNode({ data, isConnectable }) {
                     left: 0,
                     width: "100%",
                     height: "14px",
-                    background: isSelected ? "#0096FF" : "#f0f0f0",
+                    background: isSelected ? "var(--node-drag-handle-bg-selected)" : "var(--node-drag-handle-bg)",
                     borderTopLeftRadius: "8px",
                     borderTopRightRadius: "8px",
                     cursor: "move",
@@ -62,43 +132,68 @@ function ConversationNode({ data, isConnectable }) {
                 }}
             />
 
-            <Handle
-                type="target"
-                position={Position.Left}
-                isConnectable={isConnectable}
-            />
+            <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
 
             <div style={{ textAlign: "left", marginTop: "10px" }}>
-                {question && (
+                {expanded ? (
+                    // Expanded view: show both user and assistant messages
+                    <>
+                        {question && (
+                            <div
+                                style={{
+                                    background: "var(--node-user-message-bg)",
+                                    padding: "8px",
+                                    borderRadius: "6px",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                <strong>User:</strong>
+                                <div
+                                    style={{ margin: 0, fontSize: "12px" }}
+                                    className={`${styles.markdownContent} ${styles.userMessage}`}
+                                >
+                                    <Markdown remarkPlugins={[remarkGfm]}>{question}</Markdown>
+                                </div>
+                            </div>
+                        )}
+
+                        <div
+                            style={{
+                                padding: "8px",
+                                background: "var(--node-assistant-message-bg)",
+                                borderRadius: "6px",
+                            }}
+                        >
+                            <strong>Assistant:</strong>
+                            <div
+                                style={{ margin: 0, fontSize: "12px" }}
+                                className={`${styles.markdownContent} ${styles.assistantMessage}`}
+                            >
+                                <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    // Collapsed view: show only summary
                     <div
                         style={{
-                            background: "#f0f0f0",
                             padding: "8px",
+                            background: "var(--node-summary-message-bg)",
                             borderRadius: "6px",
-                            marginBottom: "8px",
+                            border: "1px solid var(--node-message-border)",
                         }}
                     >
-                        <strong>User:</strong>
-                        <p style={{ margin: 0, fontSize: "12px" }}>
-                            {expanded ? question : truncateText(question, 100)}
-                        </p>
+                        <strong>Summary:</strong>
+                        <div
+                            style={{ margin: 0, fontSize: "12px" }}
+                            className={`${styles.markdownContent} ${styles.summaryMessage}`}
+                        >
+                            <Markdown remarkPlugins={[remarkGfm]}>{summary || truncateText(answer, 150)}</Markdown>
+                        </div>
                     </div>
                 )}
 
-                <div
-                    style={{
-                        padding: "8px",
-                        background: "#e8f4fd",
-                        borderRadius: "6px",
-                    }}
-                >
-                    <strong>Assistant:</strong>
-                    <p style={{ margin: 0, fontSize: "12px" }}>
-                        {expanded ? answer : truncateText(answer, 150)}
-                    </p>
-                </div>
-
-                {(question?.length > 100 || answer?.length > 150) && (
+                {(question || answer) && (
                     <Button
                         size="sm"
                         variant="outline-secondary"
@@ -112,12 +207,26 @@ function ConversationNode({ data, isConnectable }) {
                         {expanded ? "Collapse" : "Expand"}
                     </Button>
                 )}
+
+                {codeData.hasCodeBlocks && (
+                    <button
+                        className={styles.viewCodeButton}
+                        onClick={handleViewCode}
+                        title="View code blocks in full screen"
+                    >
+                        View Code ({codeData.codeBlocks.length})
+                    </button>
+                )}
             </div>
 
-            <Handle
-                type="source"
-                position={Position.Right}
-                isConnectable={isConnectable}
+            <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
+
+            {/* Code Modal */}
+            <CodeModal
+                show={showCodeModal}
+                onHide={() => setShowCodeModal(false)}
+                codeBlocks={codeData.codeBlocks}
+                title={`Code from ${question ? "User and " : ""}Assistant Message`}
             />
         </div>
     );

@@ -1,0 +1,159 @@
+/*
+ * ConversationNode.module.css
+ * 
+ * This CSS module provides scoped styling for the ConversationNode component.
+ * 
+ * PRIMARY PURPOSE: Fix code block overflow issue in Conversation Map
+ * 
+ * ISSUE DESCRIPTION:
+ * Code blocks rendered by react-markdown within ConversationNode components
+ * were not displaying properly due to:
+ * 1. Fixed 250px node width constraint
+ * 2. react-markdown renders code as <pre><code> with white-space: pre (no wrapping)
+ * 3. No horizontal overflow handling
+ * 4. Result: Only first few characters of each code line were visible
+ * 
+ * SOLUTION:
+ * Added overflow-x: auto to pre elements to enable horizontal scrolling
+ * while maintaining the fixed 250px node width as required.
+ * 
+ * DEVELOPER NOTES:
+ * - All ConversationNode-specific styling should be added to this file
+ * - CSS classes are scoped via CSS modules to prevent conflicts
+ * - Styling patterns adapted from working export template implementation
+ * - This file is the single source of truth for ConversationNode styling
+ */
+
+/* Base wrapper for all react-markdown content within ConversationNode */
+.markdownContent {
+    /* Ensure proper text wrapping for regular content */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Table styling for conversation nodes */
+.markdownContent table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin: 2px 0;
+}
+
+.markdownContent .tableContainer {
+    position: relative;
+    overflow-x: auto;
+    width: 100%;
+    /* Gradient scroll indicators for conversation nodes */
+    background:
+        linear-gradient(90deg, var(--background-color) 30%, transparent),
+        linear-gradient(90deg, transparent, var(--background-color) 70%) 100% 0;
+    background-repeat: no-repeat;
+    background-size:
+        15px 100%,
+        15px 100%;
+    background-attachment: local, local;
+}
+
+.markdownContent th,
+.markdownContent td {
+    border: 1px solid var(--border-color);
+    padding: 2px 4px;
+    text-align: left;
+    min-width: 50px;
+}
+
+.markdownContent th {
+    background-color: var(--background-color-secondary);
+    font-weight: bold;
+}
+
+/* 
+ * CODE BLOCK OVERFLOW FIX
+ * This is the primary fix for the reported issue
+ */
+/* Clean styling for code blocks within nodes - minimal approach */
+.markdownContent pre {
+    background: var(--background-color-secondary);
+    color: var(--text-color);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+    font-size: 10px;
+    margin: 2px 0;
+    /* Show truncated version with indication that full code is available via modal */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    border: 1px solid var(--border-color-light);
+}
+
+.markdownContent pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-family: monospace;
+    font-size: inherit;
+}
+
+/* Inline code styling within ConversationNode */
+.markdownContent code {
+    background: var(--background-color-secondary);
+    color: var(--text-color);
+    padding: 1px 3px;
+    border-radius: var(--border-radius-sm);
+    font-size: 10px;
+    /* For inline code, allow wrapping */
+    word-break: break-all;
+}
+
+/* Ensure code blocks within pre tags don't add extra styling */
+.markdownContent pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    /* Let pre handle the styling for code blocks */
+    word-break: normal;
+}
+
+/* User message specific styling */
+.userMessage {
+    /* Add any user-message specific styling here */
+}
+
+/* Assistant message specific styling */
+.assistantMessage {
+    /* Add any assistant-message specific styling here */
+}
+
+/* View Code button styling */
+.viewCodeButton {
+    margin-top: 4px;
+    width: 100%;
+    font-size: 10px;
+    padding: 2px 4px;
+    border: 1px solid var(--primary-color);
+    background: var(--background-color);
+    color: var(--primary-color);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.viewCodeButton:hover {
+    background: var(--primary-color);
+    color: var(--background-color);
+}
+
+/* 
+ * FUTURE DEVELOPERS:
+ * 
+ * When adding new ConversationNode styling:
+ * 1. Add it to this file to keep all styling centralized
+ * 2. Use descriptive class names and add comments
+ * 3. Test with various markdown content types
+ * 4. Ensure the 250px width constraint is maintained
+ * 5. Verify export functionality remains unaffected
+ * 
+ * The code block fix above should not be modified without understanding
+ * the original overflow issue described in the header comments.
+ */

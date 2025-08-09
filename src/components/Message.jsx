@@ -1,4 +1,6 @@
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import styles from "./Message.module.css";
 
 const Message = (props) => {
     return (
@@ -10,7 +12,9 @@ const Message = (props) => {
                 display: "inline-block",
             }}
         >
-            <Markdown>{props.content}</Markdown>
+            <div className={styles.markdownContent}>
+                <Markdown remarkPlugins={[remarkGfm]}>{props.content}</Markdown>
+            </div>
         </div>
     );
 };

@@ -1,0 +1,150 @@
+/* Light Theme (Default) */
+[data-theme="light"] {
+    /* Colors - Light Theme Override */
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+
+    /* Background Colors */
+    --background-color: #ffffff;
+    --background-color-secondary: #f8f9fa;
+    --background-color-tertiary: #e9ecef;
+
+    /* Text Colors */
+    --text-color: #212529;
+    --text-color-muted: #6c757d;
+    --text-color-light: #495057;
+
+    /* Border Colors */
+    --border-color: #dee2e6;
+    --border-color-light: #e9ecef;
+    --border-color-dark: #adb5bd;
+
+    /* Sidebar Specific */
+    --sidebar-background: var(--background-color-secondary);
+    --sidebar-border: var(--border-color);
+    --sidebar-text: var(--text-color);
+    --sidebar-text-muted: var(--text-color-muted);
+
+    /* Panel Resize Handle */
+    --resize-handle-color: var(--border-color);
+    --resize-handle-hover-color: var(--primary-color);
+
+    /* Conversation Node Colors - Light Theme */
+    --node-background: #fefefe;
+    --node-background-selected: #e3f2fd;
+    --node-border: #d1d9e0;
+    --node-border-selected: #1976d2;
+    --node-shadow: rgba(0, 0, 0, 0.08);
+    --node-shadow-selected: rgba(25, 118, 210, 0.3);
+    --node-user-message-bg: #f5f7fa;
+    --node-assistant-message-bg: #e8f5e8;
+    --node-summary-message-bg: #f9f9fb;
+    --node-message-border: #d1d9e0;
+    --node-drag-handle-bg: #d1d9e0;
+    --node-drag-handle-bg-selected: #1976d2;
+
+    /* Active Conversation Colors - Light Theme */
+    --chat-message-list-bg: #fafbfc;
+    --chat-user-message-bg: #e3f2fd;
+    --chat-user-message-text: #1a1a1a;
+    --chat-user-message-border: #bbdefb;
+    --chat-assistant-message-bg: #e8f5e8;
+    --chat-assistant-message-text: #1a1a1a;
+    --chat-assistant-message-border: #c8e6c9;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+    /* Colors - Dark Theme */
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+
+    /* Background Colors */
+    --background-color: #212529;
+    --background-color-secondary: #343a40;
+    --background-color-tertiary: #495057;
+
+    /* Text Colors */
+    --text-color: #f8f9fa;
+    --text-color-muted: #b5bec7;
+    --text-color-light: #dee2e6;
+
+    /* Border Colors */
+    --border-color: #495057;
+    --border-color-light: #6c757d;
+    --border-color-dark: #343a40;
+
+    /* Sidebar Specific */
+    --sidebar-background: var(--background-color-secondary);
+    --sidebar-border: var(--border-color);
+    --sidebar-text: var(--text-color);
+    --sidebar-text-muted: var(--text-color-muted);
+
+    /* Panel Resize Handle */
+    --resize-handle-color: var(--border-color);
+    --resize-handle-hover-color: var(--primary-color);
+
+    /* Conversation Node Colors - Dark Theme */
+    --node-background: #2d3748;
+    --node-background-selected: #1a365d;
+    --node-border: #4a5568;
+    --node-border-selected: #3182ce;
+    --node-shadow: rgba(0, 0, 0, 0.3);
+    --node-shadow-selected: rgba(49, 130, 206, 0.4);
+    --node-user-message-bg: #4a5568;
+    --node-assistant-message-bg: #2c5282;
+    --node-summary-message-bg: #374151;
+    --node-message-border: #6b7280;
+    --node-drag-handle-bg: #6b7280;
+    --node-drag-handle-bg-selected: #3182ce;
+
+    /* Active Conversation Colors - Dark Theme */
+    --chat-message-list-bg: #1a202c;
+    --chat-user-message-bg: #2d3748;
+    --chat-user-message-text: #e2e8f0;
+    --chat-user-message-border: #4a5568;
+    --chat-assistant-message-bg: #1a365d;
+    --chat-assistant-message-text: #e2e8f0;
+    --chat-assistant-message-border: #2c5282;
+}
+
+/* System preference detection fallback */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        /* Apply dark theme when no explicit theme is set and user prefers dark */
+        --primary-color: #0d6efd;
+        --secondary-color: #6c757d;
+        --success-color: #198754;
+        --danger-color: #dc3545;
+        --warning-color: #ffc107;
+        --info-color: #0dcaf0;
+
+        --background-color: #212529;
+        --background-color-secondary: #343a40;
+        --background-color-tertiary: #495057;
+
+        --text-color: #f8f9fa;
+        --text-color-muted: #adb5bd;
+        --text-color-light: #dee2e6;
+
+        --border-color: #495057;
+        --border-color-light: #6c757d;
+        --border-color-dark: #343a40;
+
+        --sidebar-background: var(--background-color-secondary);
+        --sidebar-border: var(--border-color);
+        --sidebar-text: var(--text-color);
+        --sidebar-text-muted: var(--text-color-muted);
+
+        --resize-handle-color: var(--border-color);
+        --resize-handle-hover-color: var(--primary-color);
+    }
+}

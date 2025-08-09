@@ -1,0 +1,165 @@
+/*
+ * CodeModal.module.css
+ * 
+ * Styling for the CodeModal component that displays code blocks
+ * in a full-screen modal with proper horizontal scrolling.
+ * 
+ * This achieves what we couldn't accomplish within the ReactFlow nodes
+ * due to container constraints.
+ */
+
+/* Modal container styling */
+.codeModal .modal-dialog {
+    max-width: 90vw;
+    width: 90vw;
+    margin: 1.75rem auto;
+}
+
+/* Modal body with proper scrolling */
+.modalBody {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+/* Copy feedback alert */
+.copyAlert {
+    margin-bottom: 1rem;
+    font-size: 14px;
+}
+
+/* Container for all code blocks */
+.codeContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Individual code block wrapper */
+.codeBlock {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+}
+
+/* Code block header with title and copy button */
+.codeHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 14px;
+}
+
+.codeTitle {
+    font-weight: 600;
+    color: #495057;
+}
+
+.copyButton {
+    font-size: 12px;
+    padding: 0.25rem 0.75rem;
+}
+
+/* 
+ * THE KEY FIX: Code content with proper horizontal scrolling
+ * This works in the modal because it's not constrained by ReactFlow
+ */
+.codeContent {
+    margin: 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: none;
+    border-radius: 0;
+    font-family: "Courier New", Consolas, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+
+    /* Enable horizontal scrolling - this actually works here! */
+    overflow-x: auto;
+    overflow-y: visible;
+    white-space: pre;
+
+    /* Ensure content doesn't wrap */
+    word-wrap: normal;
+    word-break: normal;
+
+    /* Add subtle styling */
+    color: #212529;
+    tab-size: 4;
+}
+
+/* Code element inside pre */
+.codeContent code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    white-space: pre;
+}
+
+/* Copy all button styling */
+.copyAllButton {
+    margin-right: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .codeModal .modal-dialog {
+        max-width: 95vw;
+        width: 95vw;
+        margin: 1rem auto;
+    }
+
+    .modalBody {
+        max-height: 60vh;
+        padding: 0.75rem;
+    }
+
+    .codeHeader {
+        padding: 0.5rem 0.75rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .copyButton {
+        align-self: flex-end;
+    }
+
+    .codeContent {
+        padding: 0.75rem;
+        font-size: 12px;
+    }
+}
+
+/* Scrollbar styling for better UX */
+.codeContent::-webkit-scrollbar {
+    height: 8px;
+}
+
+.codeContent::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.codeContent::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.codeContent::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/*
+ * SUCCESS: This modal approach bypasses all the ReactFlow container
+ * constraints that prevented horizontal scrolling in the nodes.
+ * The code blocks now display properly with full scrolling capability.
+ */

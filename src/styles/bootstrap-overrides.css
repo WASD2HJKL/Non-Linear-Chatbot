@@ -1,0 +1,4 @@
+/* Bootstrap text-muted override for theme support */
+.text-muted {
+    color: var(--text-color-muted) !important;
+}
