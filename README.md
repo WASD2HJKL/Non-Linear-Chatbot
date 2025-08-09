@@ -206,7 +206,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Special thanks to Zhiyuan Shao (<shao.zhiyu@northeastern.edu>), who sparks the idea of mind map.
-
-## 📧 Contact
-
-Project Link: [https://github.com/HongzhengL/Non-Linear-LLM-Chat](https://github.com/HongzhengL/Non-Linear-LLM-Chat)
