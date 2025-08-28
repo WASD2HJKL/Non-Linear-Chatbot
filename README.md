@@ -6,6 +6,7 @@
 
 A revolutionary conversational AI application that breaks free from traditional linear chat interfaces. Create branching conversation trees, explore multiple dialogue paths, and visualize your conversations as interactive node graphs.
 
+
 ![Version](https://img.shields.io/badge/version-0.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
@@ -91,9 +92,10 @@ A revolutionary conversational AI application that breaks free from traditional 
 
 3. **Start the development server**
 
-    ```bash
-    wasp start
-    ```
+   ```bash
+   wasp start db
+   wasp start
+   ```
 
 4. **Access the application**
 
