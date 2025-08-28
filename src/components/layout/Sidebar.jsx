@@ -18,7 +18,7 @@ import styles from "./Sidebar.module.css";
  * @returns {JSX.Element} Sidebar component
  */
 const Sidebar = ({ user, onNewChat, onShowSettings, onBackToList, className = "" }) => {
-    const { theme, toggleTheme, isDark } = useTheme();
+    const { toggleTheme, isDark } = useTheme();
     const { collapsed, toggle: toggleSidebar, width, showText } = useSidebarState();
 
     const sidebarStyle = {

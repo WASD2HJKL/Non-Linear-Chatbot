@@ -1,5 +1,6 @@
 import { HttpError } from "wasp/server";
-import type { CreateConversation, UpdateLastActiveNodeId } from "wasp/server/operations";
+import type { CreateConversation, UpdateLastActiveNodeId, DeleteConversation } from "wasp/server/operations";
+import type { Conversation } from "@prisma/client";
 import { generateUUID } from "../../utils/uuid";
 import { sanitizeContent } from "../utils/sanitizer";
 
@@ -10,7 +11,11 @@ type UpdateLastActiveNodeIdInput = {
     lastActiveNodeId: string | null;
 };
 
-export const createConversation: CreateConversation<CreateConversationInput, any> = async (args, context) => {
+type DeleteConversationInput = {
+    conversationId: string;
+};
+
+export const createConversation: CreateConversation<CreateConversationInput, Conversation> = async (args, context) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
     return await context.entities.Conversation.create({
@@ -22,7 +27,7 @@ export const createConversation: CreateConversation<CreateConversationInput, any
     });
 };
 
-export const updateLastActiveNodeId: UpdateLastActiveNodeId<UpdateLastActiveNodeIdInput, any> = async (
+export const updateLastActiveNodeId: UpdateLastActiveNodeId<UpdateLastActiveNodeIdInput, void> = async (
     args,
     context,
 ) => {
@@ -47,8 +52,34 @@ export const updateLastActiveNodeId: UpdateLastActiveNodeId<UpdateLastActiveNode
         if (!node) throw new HttpError(400, "Invalid node reference");
     }
 
-    return await context.entities.Conversation.update({
+    await context.entities.Conversation.update({
         where: { id: args.conversationId },
         data: { lastActiveNodeId: args.lastActiveNodeId },
+    });
+};
+
+export const deleteConversation: DeleteConversation<DeleteConversationInput, void> = async (args, context) => {
+    if (!context.user) throw new HttpError(401, "Unauthorized");
+
+    // Verify the conversation exists and belongs to the user
+    const conversation = await context.entities.Conversation.findFirst({
+        where: {
+            id: args.conversationId,
+            userId: context.user.id,
+        },
+    });
+
+    if (!conversation) {
+        throw new HttpError(404, "Conversation not found");
+    }
+
+    // Soft delete by setting visible to false and updating updatedAt
+    await context.entities.Conversation.update({
+        where: {
+            id: args.conversationId,
+        },
+        data: {
+            visible: false,
+        },
     });
 };

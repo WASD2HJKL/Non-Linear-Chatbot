@@ -87,6 +87,26 @@
     border: 1px solid var(--border-color-light);
 }
 
+/* 
+ * EXPANDED NODE CODE BLOCKS
+ * This rule applies only to code blocks within expanded nodes, 
+ * allowing full multi-line display with horizontal scrolling
+ */
+.markdownContent.expanded pre {
+    background: var(--background-color-secondary);
+    color: var(--text-color);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+    font-size: 10px;
+    margin: 2px 0;
+    /* Enable horizontal scrolling for wide code blocks */
+    overflow-x: auto;
+    /* Allow multiple lines and preserve formatting */
+    white-space: pre;
+    max-width: 100%;
+    border: 1px solid var(--border-color-light);
+}
+
 .markdownContent pre code {
     background: transparent;
     padding: 0;

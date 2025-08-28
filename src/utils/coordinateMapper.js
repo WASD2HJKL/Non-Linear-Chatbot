@@ -4,7 +4,7 @@ function getDirectReactFlowPositions(nodePositions) {
     return nodePositions;
 }
 
-function calculateSVGViewBox(nodePositions, isFullTree) {
+function calculateSVGViewBox(nodePositions, _isFullTree) {
     if (!nodePositions || Object.keys(nodePositions).length === 0) {
         return "0 0 800 600";
     }

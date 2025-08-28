@@ -13,7 +13,7 @@ const defaultSettings = {
     pageOrientation: "landscape",
 };
 
-function ExportModal({ show, onHide, conversationTree, nodePositions, user, onExport }) {
+function ExportModal({ show, onHide, onExport }) {
     const [settings, setSettings] = useState(defaultSettings);
     const [isExporting, setIsExporting] = useState(false);
 

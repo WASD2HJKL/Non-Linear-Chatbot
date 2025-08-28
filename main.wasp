@@ -82,9 +82,9 @@ page PasswordResetPage {
   authRequired: false
 }
 
-api openaiStream {
-  fn: import { openaiStream } from "@src/server/openaiStream",
-  httpRoute: (ALL, "/api/openai/stream"),
+api aiStream {
+  fn: import { aiStream } from "@src/server/openaiStream",
+  httpRoute: (ALL, "/api/ai/stream"),
   middlewareConfigFn: import { configureMiddleware } from "@src/server/openaiStream",
   auth: true
 }
@@ -92,6 +92,16 @@ api openaiStream {
 action createConversation {
   fn: import { createConversation } from "@src/server/actions/conversations",
   entities: [User, Conversation]
+}
+
+action deleteConversation {
+  fn: import { deleteConversation } from "@src/server/actions/conversations",
+  entities: [User, Conversation]
+}
+
+action updateConversationTitle {
+  fn: import { updateConversationTitle } from "@src/server/services/conversationTitleService",
+  entities: [User, Conversation, Node]
 }
 
 
@@ -127,6 +137,11 @@ action updateNodeExpanded {
 
 action updateNodePinned {
   fn: import { updateNodePinned } from "@src/server/actions/nodes",
+  entities: [User, Node]
+}
+
+action deleteNode {
+  fn: import { deleteNode } from "@src/server/actions/nodes",
   entities: [User, Node]
 }
 

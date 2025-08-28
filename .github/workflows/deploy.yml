@@ -34,7 +34,7 @@ jobs:
             - name: Install dependencies and build the client
               run: |
                   cd ./.wasp/build/web-app
-                  npm install
+                  npm ci
                   REACT_APP_API_URL=${{ secrets.WASP_SERVER_URL }} npm run build
 
             - name: Deploy to Heroku

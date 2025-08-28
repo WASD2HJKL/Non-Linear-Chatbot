@@ -29,7 +29,6 @@ function generateSteppedPath(x1, y1, x2, y2) {
 function generateCurvedPath(x1, y1, x2, y2) {
     // Calculate control points for a smooth curve
     const dx = x2 - x1;
-    const dy = y2 - y1;
 
     // Control point offset - stronger curve for longer distances
     const controlOffset = Math.min(Math.abs(dx) * 0.5, 150);

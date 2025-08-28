@@ -1,11 +1,12 @@
 import { HttpError } from "wasp/server";
 import type { GetConversationNodes } from "wasp/server/operations";
+import type { Node } from "@prisma/client";
 
 type GetNodesInput = {
     conversationId: string;
 };
 
-export const getConversationNodes: GetConversationNodes<GetNodesInput, any> = async (args, context) => {
+export const getConversationNodes: GetConversationNodes<GetNodesInput, Node[]> = async (args, context) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
     const conversation = await context.entities.Conversation.findFirst({

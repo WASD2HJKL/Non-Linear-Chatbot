@@ -5,8 +5,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import styles from "./ConversationNode.module.css";
 import CodeModal from "./CodeModal";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { detectCodeBlocks, extractCodeContent } from "../utils/codeBlockDetector";
-import { updateNodeExpanded } from "wasp/client/operations";
 
 function ConversationNode({ data, isConnectable }) {
     const {
@@ -17,6 +17,7 @@ function ConversationNode({ data, isConnectable }) {
         onClick,
         onWidthChange,
         onExpandedChange,
+        onDelete,
         width = 250,
         expanded: initialExpanded = false,
         nodeId,
@@ -24,6 +25,7 @@ function ConversationNode({ data, isConnectable }) {
     } = data;
     const [expanded, setExpanded] = useState(initialExpanded);
     const [showCodeModal, setShowCodeModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [codeData, setCodeData] = useState({ hasCodeBlocks: false, codeBlocks: [] });
 
     // Detect code blocks when content changes
@@ -105,6 +107,25 @@ function ConversationNode({ data, isConnectable }) {
         setShowCodeModal(true);
     };
 
+    // Handle delete button click
+    const handleDelete = (e) => {
+        e.stopPropagation();
+        setShowDeleteModal(true);
+    };
+
+    // Handle delete confirmation
+    const handleConfirmDelete = async () => {
+        setShowDeleteModal(false);
+        if (onDelete) {
+            try {
+                await onDelete(nodeId);
+            } catch (error) {
+                console.error("Failed to delete node:", error);
+                alert("Failed to delete node. Please try again.");
+            }
+        }
+    };
+
     // Handle node resize end (only update on resize completion)
     const handleResizeEnd = (event, params) => {
         if (onWidthChange && params.width) {
@@ -150,7 +171,7 @@ function ConversationNode({ data, isConnectable }) {
                                 <strong>User:</strong>
                                 <div
                                     style={{ margin: 0, fontSize: "12px" }}
-                                    className={`${styles.markdownContent} ${styles.userMessage}`}
+                                    className={`${styles.markdownContent}${expanded ? ` ${styles.expanded}` : ""} ${styles.userMessage}`}
                                 >
                                     <Markdown remarkPlugins={[remarkGfm]}>{question}</Markdown>
                                 </div>
@@ -167,7 +188,7 @@ function ConversationNode({ data, isConnectable }) {
                             <strong>Assistant:</strong>
                             <div
                                 style={{ margin: 0, fontSize: "12px" }}
-                                className={`${styles.markdownContent} ${styles.assistantMessage}`}
+                                className={`${styles.markdownContent}${expanded ? ` ${styles.expanded}` : ""} ${styles.assistantMessage}`}
                             >
                                 <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown>
                             </div>
@@ -194,18 +215,32 @@ function ConversationNode({ data, isConnectable }) {
                 )}
 
                 {(question || answer) && (
-                    <Button
-                        size="sm"
-                        variant="outline-secondary"
-                        onClick={toggleExpand}
-                        style={{
-                            marginTop: "8px",
-                            width: "100%",
-                            fontSize: "10px",
-                        }}
-                    >
-                        {expanded ? "Collapse" : "Expand"}
-                    </Button>
+                    <div style={{ display: "flex", gap: "4px", marginTop: "8px" }}>
+                        <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={toggleExpand}
+                            style={{
+                                flex: 1,
+                                fontSize: "10px",
+                            }}
+                        >
+                            {expanded ? "Collapse" : "Expand"}
+                        </Button>
+                        {onDelete && (
+                            <Button
+                                size="sm"
+                                variant="outline-danger"
+                                onClick={handleDelete}
+                                style={{
+                                    fontSize: "10px",
+                                    width: "60px",
+                                }}
+                            >
+                                Delete
+                            </Button>
+                        )}
+                    </div>
                 )}
 
                 {codeData.hasCodeBlocks && (
@@ -227,6 +262,14 @@ function ConversationNode({ data, isConnectable }) {
                 onHide={() => setShowCodeModal(false)}
                 codeBlocks={codeData.codeBlocks}
                 title={`Code from ${question ? "User and " : ""}Assistant Message`}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleConfirmDelete}
+                nodeSummary={summary || truncateText(answer, 100)}
             />
         </div>
     );

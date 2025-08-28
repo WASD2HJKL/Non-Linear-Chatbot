@@ -29,7 +29,7 @@ class StorageService {
     removeItem(key) {
         try {
             localStorage.removeItem(key);
-        } catch (error) {
+        } catch (_error) {
             // Silent failure - no-op if key doesn't exist
         }
     }
