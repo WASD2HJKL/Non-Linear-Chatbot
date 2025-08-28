@@ -1,5 +1,6 @@
 import rateLimit from "express-rate-limit";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
+import logger from "../utils/logger";
 
 interface RateLimiterOptions {
     windowMs?: number;
@@ -11,7 +12,7 @@ export const createRateLimiter = (options: RateLimiterOptions = {}) => {
     const windowMs = options.windowMs || parseInt(process.env.RATE_LIMIT_WINDOW_MS || "3600000"); // 1 hour default
     const max = options.max || parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100"); // 100 requests default
 
-    console.log("[RATE LIMITER DEBUG] Creating rate limiter with windowMs:", windowMs, "max:", max);
+    logger.debug(`[RATE LIMITER DEBUG] Creating rate limiter with windowMs: ${windowMs}, max: ${max}`);
 
     return rateLimit({
         windowMs,
@@ -21,18 +22,18 @@ export const createRateLimiter = (options: RateLimiterOptions = {}) => {
         legacyHeaders: false, // Disable the `X-RateLimit-*` headers
         keyGenerator: (req: Request) => {
             // Use authenticated user ID if available, otherwise fall back to IP
-            const user = (req as any).user || (req as any).context?.user;
+            type ContextUser = { id?: string | number };
+            type ReqWithAuth = Request & { user?: ContextUser; context?: { user?: ContextUser } };
+            const r = req as ReqWithAuth;
+            const user = r.user ?? r.context?.user;
             const key = user?.id?.toString() || req.ip || "anonymous";
-            console.log(
-                "[RATE LIMITER DEBUG] Generated key for user:",
-                key,
-                "user object:",
-                user ? `id: ${user.id}` : "no user",
+            logger.debug(
+                `[RATE LIMITER DEBUG] Generated key for user: ${key}, user object: ${user ? `id: ${user.id}` : "no user"}`,
             );
             return key;
         },
         handler: (req: Request, res: Response) => {
-            console.log("[RATE LIMITER DEBUG] Rate limit exceeded for", req.url);
+            logger.warn(`[RATE LIMITER DEBUG] Rate limit exceeded for ${req.url}`);
             const retryAfter = res.get("Retry-After");
             res.status(429).json({
                 error: "Too many requests",

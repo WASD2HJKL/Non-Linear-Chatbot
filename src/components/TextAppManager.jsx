@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "wasp/client/auth";
-import { useQuery } from "wasp/client/operations";
-import { getConversations, createConversation } from "../client/operations/conversations";
+import { createConversation } from "../client/operations/conversations";
 import TextApp from "./TextApp";
 import ConversationCanvas from "./ConversationCanvas";
 import Settings from "./Settings";
@@ -9,7 +8,6 @@ import LayoutContainer from "./layout/LayoutContainer";
 import Sidebar from "./layout/Sidebar";
 import ResizablePanelLayout from "./layout/ResizablePanelLayout";
 import { Spinner } from "react-bootstrap";
-import useStorage from "../hook/useStorage";
 import configService from "../services/configService";
 import apiClientService from "../services/apiClientService";
 import { LAYOUT_CONSTANTS } from "../constants/layoutConstants";
@@ -20,7 +18,7 @@ export default function TextAppManager({ conversationId }) {
     const navigate = useNavigate();
     // Auth state
     const { data: user, isLoading: isAuthLoading } = useAuth();
-    const { data: conversations, isLoading: conversationsLoading } = useQuery(getConversations);
+    // const { data: conversations, isLoading: conversationsLoading } = useQuery(getConversations);
 
     // Node-based state management
     const {
@@ -32,8 +30,9 @@ export default function TextAppManager({ conversationId }) {
         updatePositions,
         updateWidths,
         selectNode,
+        deleteNode,
         reconstructMessages,
-        hasNodes,
+        // hasNodes,
         refresh,
     } = useConversationNodes(conversationId);
 
@@ -251,6 +250,7 @@ export default function TextAppManager({ conversationId }) {
                         onNodeSelect={handleNodeSelect}
                         onNodePositionUpdate={handleNodePositionUpdate}
                         onNodeWidthUpdate={handleNodeWidthUpdate}
+                        onNodeDelete={deleteNode}
                         onRefresh={refresh}
                     />
                 }
@@ -260,7 +260,6 @@ export default function TextAppManager({ conversationId }) {
                         initialMessages={currentMessages}
                         onNewMessagePair={handleNewMessagePair}
                         config={configService.getChatConfig()}
-                        apiSettings={apiSettings}
                         conversationId={conversationId}
                     />
                 }

@@ -19,9 +19,9 @@ export const NewChatPage = () => {
             creatingRef.current = true;
 
             try {
-                const newConversation = await createConversation({
+                const newConversation = (await createConversation({
                     title: "New Conversation",
-                });
+                })) as { id: string };
 
                 // Navigate to the new conversation
                 navigate(`/chat/${newConversation.id}`);
@@ -33,7 +33,7 @@ export const NewChatPage = () => {
         };
 
         if (user && !creatingRef.current) {
-            createNewConversation();
+            void createNewConversation();
         }
     }, [user, navigate]);
 

@@ -185,7 +185,7 @@ export function useMeasureNodeDimensions(nodeIds = []) {
      * Force re-measurement of all tracked nodes
      */
     const remeasure = useCallback(() => {
-        elementsRef.current.forEach((element, nodeId) => {
+        elementsRef.current.forEach((element, _nodeId) => {
             if (element && observerRef.current) {
                 // Trigger re-measurement by briefly unobserving and re-observing
                 observerRef.current.unobserve(element);

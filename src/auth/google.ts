@@ -1,13 +1,23 @@
 import { defineUserSignupFields } from "wasp/server/auth";
 
-function validateEmailForGoogle(data: any): string {
+interface GoogleProfile {
+    email?: string;
+    given_name?: string;
+    family_name?: string;
+}
+
+interface GoogleAuthData {
+    profile?: GoogleProfile;
+}
+
+function validateEmailForGoogle(data: GoogleAuthData): string {
     if (!data.profile?.email) {
         throw new Error("Email is required from Google profile");
     }
     return data.profile.email;
 }
 
-function validateFirstNameForGoogle(data: any): string | undefined {
+function validateFirstNameForGoogle(data: GoogleAuthData): string | undefined {
     const firstName = data.profile?.given_name;
     if (!firstName || firstName.trim() === "") {
         return undefined;
@@ -21,7 +31,7 @@ function validateFirstNameForGoogle(data: any): string | undefined {
     return firstName.trim();
 }
 
-function validateLastNameForGoogle(data: any): string | undefined {
+function validateLastNameForGoogle(data: GoogleAuthData): string | undefined {
     const lastName = data.profile?.family_name;
     if (!lastName || lastName.trim() === "") {
         return undefined;
@@ -35,7 +45,7 @@ function validateLastNameForGoogle(data: any): string | undefined {
     return lastName.trim();
 }
 
-function validateUsernameForGoogle(data: any): string {
+function validateUsernameForGoogle(data: GoogleAuthData): string {
     if (!data.profile?.email) {
         throw new Error("Email is required from Google profile for username");
     }

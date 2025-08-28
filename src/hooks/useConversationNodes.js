@@ -239,6 +239,59 @@ export function useConversationNodes(conversationId) {
         [updateLastActiveNode],
     );
 
+    // Delete a node and its descendants
+    const deleteNode = useCallback(
+        async (nodeId) => {
+            if (!nodeId) {
+                throw new Error("No node ID provided");
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                await nodeService.deleteNode(nodeId);
+
+                // Filter out deleted node and its descendants from local state
+                setNodes((prevNodes) => {
+                    // Find all descendants by checking path
+                    const nodeIdsToRemove = new Set([nodeId]);
+
+                    prevNodes.forEach((node) => {
+                        if (node.path && Array.isArray(node.path) && node.path.includes(nodeId)) {
+                            nodeIdsToRemove.add(node.id);
+                        }
+                    });
+
+                    return prevNodes.filter((node) => !nodeIdsToRemove.has(node.id));
+                });
+
+                // If the deleted node was active, select a different node
+                if (activeNodeId === nodeId) {
+                    setActiveNodeId((_currentActiveNodeId) => {
+                        const remainingNodes = nodes.filter((n) => n.id !== nodeId);
+                        if (remainingNodes.length > 0) {
+                            const latestNode = remainingNodes.reduce((latest, current) =>
+                                new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest,
+                            );
+                            return latestNode.id;
+                        }
+                        return null;
+                    });
+                }
+
+                // Refresh nodes from server to ensure consistency
+                await loadNodes();
+            } catch (err) {
+                setError(err.message || "Failed to delete node");
+                throw err;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [activeNodeId, nodes, loadNodes],
+    );
+
     // Refresh nodes from server
     const refresh = useCallback(() => {
         loadNodes();
@@ -256,6 +309,7 @@ export function useConversationNodes(conversationId) {
         updatePositions,
         updateWidths,
         selectNode,
+        deleteNode,
         refresh,
 
         // Utilities

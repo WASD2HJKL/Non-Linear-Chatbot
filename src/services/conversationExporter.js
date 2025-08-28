@@ -2,7 +2,7 @@ import metadataCollector from "./metadataCollector";
 import htmlNodeRenderer from "./htmlNodeRenderer";
 import svgTreeRenderer from "./svgTreeRenderer";
 import exportTemplate from "../templates/exportTemplate";
-import html2canvas from "html2canvas";
+import logger from "../utils/clientLogger";
 
 async function exportConversation(options) {
     try {
@@ -11,7 +11,7 @@ async function exportConversation(options) {
             throw new Error("Missing required options: conversationTree or conversationNodes is required");
         }
 
-        const { conversationTree, conversationNodes, nodePositions, user, settings, reactFlowRef } = options;
+        const { conversationTree, conversationNodes, nodePositions, user, settings } = options;
 
         // Convert new node format to old tree format if needed
         const actualConversationTree = conversationTree || convertNodesToTree(conversationNodes, nodePositions);
@@ -232,8 +232,8 @@ function adjustNodePositionsToContainer(nodePositions, containerDims, isFullTree
     const offsetX = -minX + padding;
     const offsetY = -minY + padding;
 
-    console.log(
-        `Position adjustment: minX=${minX}, minY=${minY}, offsetX=${offsetX}, offsetY=${offsetY}, isFullTree=${isFullTree}`,
+    logger.debug(
+        `[EXPORT] Position adjustment: minX=${minX}, minY=${minY}, offsetX=${offsetX}, offsetY=${offsetY}, isFullTree=${isFullTree}`,
     );
 
     // Adjust all positions
@@ -339,14 +339,14 @@ function convertNodesToTree(conversationNodes, nodePositions) {
     });
 
     // Debug: log the converted tree structure
-    console.log("Converted tree structure:", tree);
-    console.log("Node positions available:", nodePositions);
+    logger.debug(`[EXPORT] Converted tree structure: ${JSON.stringify(tree)}`);
+    logger.debug(`[EXPORT] Node positions available: ${JSON.stringify(nodePositions)}`);
 
     // Debug: check if root node has position
     if (nodePositions && nodePositions["root"]) {
-        console.log("Root node position:", nodePositions["root"]);
+        logger.debug(`[EXPORT] Root node position: ${JSON.stringify(nodePositions["root"])}`);
     } else {
-        console.log("No position found for root node");
+        logger.warn("[EXPORT] No position found for root node");
     }
 
     return tree;

@@ -1,10 +1,14 @@
 import { pipeline, Transform } from "stream";
+import type { TransformCallback } from "stream";
 import { StreamRequestSchema } from "../shared/validation";
 import { PrismaClient } from "@prisma/client";
 import { createRateLimiter } from "./middleware/rateLimiter";
 import { AuthenticatedRequest, WaspResponse, WaspContext } from "./types/express";
-import { isValidOpenAIModel, getValidOpenAIModels } from "./services/configService";
-import { openai } from "./services/openaiClient";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
+import { isValidModelForProvider, isValidProvider } from "./services/configService";
+import { createProviderClient } from "./services/openaiClient";
+import { normalizeProviderError } from "./services/errorNormalizer";
+import logger from "./utils/logger";
 
 const prisma = new PrismaClient();
 
@@ -24,18 +28,18 @@ const getCorsOrigin = (): string => {
     throw new Error("WASP_WEB_CLIENT_URL environment variable must be set in production");
 };
 
-export const openaiStream = async (
+export const aiStream = async (
     req: AuthenticatedRequest,
     res: WaspResponse,
     context: WaspContext,
 ): Promise<void | WaspResponse> => {
     // Handle OPTIONS preflight requests first
     if (req.method === "OPTIONS") {
-        console.log("[CORS FIX] Handling OPTIONS preflight in openaiStream");
+        logger.debug("[CORS FIX] Handling OPTIONS preflight in aiStream");
         const origin = req.headers.origin;
         const allowedOrigin = getCorsOrigin();
 
-        console.log("[CORS FIX] Origin:", origin, "Allowed:", allowedOrigin);
+        logger.debug(`[CORS FIX] Origin: ${origin}, Allowed: ${allowedOrigin}`);
 
         if (origin === allowedOrigin) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -50,7 +54,7 @@ export const openaiStream = async (
     // For POST requests, we have authentication from context
     const user = context.user;
     if (!user) {
-        console.log("[OpenAI API] Authentication failed - no user found in context");
+        logger.warn("[OpenAI API] Authentication failed - no user found in context");
         return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -74,19 +78,31 @@ export const openaiStream = async (
         });
     }
 
-    const { messages, conversationId, model } = parseResult.data;
+    const { messages, conversationId, model, provider } = parseResult.data;
 
-    if (!isValidOpenAIModel(model)) {
-        const validModels = getValidOpenAIModels();
+    // Default to OpenAI for backward compatibility
+    const selectedProvider = provider || "openai";
+
+    // Validate provider exists
+    if (!isValidProvider(selectedProvider)) {
         return res.status(400).json({
-            error: `Invalid model. Must be one of: ${validModels.join(", ")}`,
+            error: `Invalid provider: ${selectedProvider}`,
+        });
+    }
+
+    // Validate model for the selected provider
+    if (!isValidModelForProvider(model, selectedProvider)) {
+        return res.status(400).json({
+            error: `Invalid model '${model}' for provider '${selectedProvider}'`,
         });
     }
 
     const startTime = Date.now();
 
     try {
-        console.log(`[OpenAI API] Stream request: user ${user.id}, ${messages.length} messages`);
+        logger.info(
+            `[AI API] Request details - User: ${user.id}, Messages: ${messages.length}, Provider: ${selectedProvider}`,
+        );
 
         // Verify user owns the conversation if conversationId provided
         if (conversationId) {
@@ -99,37 +115,67 @@ export const openaiStream = async (
 
             if (!conversation) {
                 console.error(
-                    `[OpenAI API] Unauthorized access attempt: user ${user.id} tried to access conversation ${conversationId}`,
+                    `[AI API] Unauthorized access attempt: user ${user.id} tried to access conversation ${conversationId}`,
                 );
                 return res.status(403).json({ error: "Forbidden: You do not have access to this conversation" });
             }
         }
 
-        // Note: This endpoint is OpenAI-specific. For multi-provider support, create a new /api/ai/stream endpoint
-        const stream = await openai.chat.completions.create({
-            model, // Use model from request, validated against config
+        // Get API key for the selected provider using convention-based lookup
+        const getApiKeyForProvider = (providerId: string): string | undefined => {
+            const conventionKey = `${providerId.toUpperCase()}_API_KEY`;
+            const providerApiKey = process.env[conventionKey];
+
+            // Fallback to OPENAI_API_KEY for backward compatibility
+            return providerApiKey || process.env.OPENAI_API_KEY;
+        };
+
+        const apiKey = getApiKeyForProvider(selectedProvider);
+        if (!apiKey) {
+            const expectedKey = `${selectedProvider.toUpperCase()}_API_KEY`;
+            return res.status(500).json({
+                error: `API key not configured for provider '${selectedProvider}'. Please set ${expectedKey} or OPENAI_API_KEY environment variable.`,
+            });
+        }
+
+        // Create provider-specific client
+        const client = createProviderClient(selectedProvider, apiKey);
+
+        // Create chat completion stream
+        logger.debug(`[STREAM DEBUG] Creating stream for provider: ${selectedProvider}, model: ${model}`);
+        const stream = await client.chat.completions.create({
+            model, // Use model from request, validated against provider config
             messages,
             stream: true,
         });
+        logger.debug(
+            `[STREAM DEBUG] Stream created successfully, type: ${typeof stream}, constructor: ${stream.constructor.name}`,
+        );
 
         let accumulatedContent = "";
 
         const transformToNDJSON = new Transform({
             objectMode: true,
-            transform(chunk: any, _encoding: any, callback: any) {
-                const content = chunk.choices?.[0]?.delta?.content;
+            transform(chunk: unknown, _encoding: unknown, callback: TransformCallback) {
+                logger.debug(`[TRANSFORM DEBUG] Provider: ${selectedProvider}, Raw chunk: ${JSON.stringify(chunk)}`);
+                const c = chunk as { choices?: Array<{ delta?: { content?: string } }> };
+                const content = c.choices?.[0]?.delta?.content;
+                logger.debug(`[TRANSFORM DEBUG] Extracted content: ${JSON.stringify(content)}`);
                 if (content) {
                     accumulatedContent += content;
-                    callback(null, JSON.stringify({ delta: content }) + "\n");
+                    const ndjsonLine = JSON.stringify({ delta: content }) + "\n";
+                    logger.debug(`[TRANSFORM DEBUG] Sending NDJSON: ${JSON.stringify(ndjsonLine)}`);
+                    callback(null, ndjsonLine);
                 } else {
+                    logger.debug("[TRANSFORM DEBUG] No content found, skipping chunk");
                     callback();
                 }
             },
 
-            async flush(callback: any) {
+            flush(callback: TransformCallback) {
                 // Node creation will be handled by the client after receiving the complete response
                 const duration = Date.now() - startTime;
-                console.log(`[OpenAI API] Stream completed: ${duration}ms, ${accumulatedContent.length} chars`);
+                logger.info(`[AI API] Stream completed: ${duration}ms, ${accumulatedContent.length} chars`);
                 callback();
             },
         });
@@ -139,43 +185,84 @@ export const openaiStream = async (
         res.setHeader("Connection", "keep-alive");
         res.setHeader("Transfer-Encoding", "chunked");
 
-        pipeline(stream, transformToNDJSON, res, (err: any) => {
-            if (err) {
+        // Handle different stream types for different providers
+        if (selectedProvider === "gemini") {
+            logger.debug("[STREAM DEBUG] Using async iterator for Gemini");
+            // Use async iterator for Gemini
+            try {
+                for await (const chunk of stream as AsyncIterable<unknown>) {
+                    logger.debug(`[STREAM DEBUG] Gemini chunk: ${JSON.stringify(chunk)}`);
+                    const c = chunk as { choices?: Array<{ delta?: { content?: string } }> };
+                    const content = c.choices?.[0]?.delta?.content;
+                    if (content) {
+                        accumulatedContent += content;
+                        const ndjsonLine = JSON.stringify({ delta: content }) + "\n";
+                        res.write(ndjsonLine);
+                    }
+                }
+                res.end();
                 const duration = Date.now() - startTime;
-                console.error(`[OpenAI API] Stream pipeline error after ${duration}ms:`, err);
-                // Node creation will be handled by the client
+                logger.info(`[AI API] Gemini stream completed: ${duration}ms, ${accumulatedContent.length} chars`);
+            } catch (err: unknown) {
+                const e = err as Error;
+                console.error(`[AI API] Gemini stream error:`, e);
+                res.status(500).json({ error: "Streaming failed" });
             }
-        });
-    } catch (error) {
+        } else {
+            // Use pipeline for OpenAI and other providers
+            logger.debug(`[STREAM DEBUG] Using pipeline for provider: ${selectedProvider}`);
+            pipeline(stream, transformToNDJSON, res, (err: unknown) => {
+                if (err) {
+                    const duration = Date.now() - startTime;
+                    const e = err as Error;
+                    console.error(`[AI API] Stream pipeline error after ${duration}ms:`, e);
+                    // Node creation will be handled by the client
+                }
+            });
+        }
+    } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        console.error(`[OpenAI API] Request failed after ${duration}ms for user ${user.id}:`, error);
-        res.status(500).json({ error: "Stream processing failed" });
+        console.error(
+            `[AI API] Request failed after ${duration}ms for user ${user.id} with provider ${selectedProvider}:`,
+            error as Error,
+        );
+
+        // Normalize error for consistent client handling
+        const normalizedError = normalizeProviderError(error, selectedProvider);
+
+        res.status(normalizedError.status).json({
+            error: normalizedError.message,
+            code: normalizedError.code,
+            type: normalizedError.type,
+            provider: normalizedError.provider,
+            isRetryable: normalizedError.isRetryable,
+        });
     }
 };
 
-export const configureMiddleware = (config: Map<string, any>) => {
-    console.log("[MIDDLEWARE DEBUG] configureMiddleware called with config:", Array.from(config.keys()));
-    console.log("[MIDDLEWARE DEBUG] Environment WASP_WEB_CLIENT_URL:", process.env.WASP_WEB_CLIENT_URL);
+export const configureMiddleware = (config: Map<string, RequestHandler>) => {
+    logger.debug(`[MIDDLEWARE DEBUG] configureMiddleware called with config: ${Array.from(config.keys()).join(", ")}`);
+    logger.debug(`[MIDDLEWARE DEBUG] Environment WASP_WEB_CLIENT_URL: ${process.env.WASP_WEB_CLIENT_URL}`);
 
     // Override Wasp's built-in CORS middleware completely with our own
-    const corsMiddleware = (req: any, res: any, next: any) => {
-        console.log("[CORS DEBUG] Custom CORS middleware executing for", req.method, req.url);
+    const corsMiddleware = (req: Request, res: Response, next: NextFunction) => {
+        logger.debug(`[CORS DEBUG] Custom CORS middleware executing for ${req.method} ${req.url}`);
         const origin = req.headers.origin;
         const allowedOrigin = getCorsOrigin();
 
-        console.log("[CORS DEBUG] Request origin:", JSON.stringify(origin));
-        console.log("[CORS DEBUG] Allowed origin:", JSON.stringify(allowedOrigin));
-        console.log("[CORS DEBUG] Request headers:", JSON.stringify(req.headers));
+        logger.debug(`[CORS DEBUG] Request origin: ${JSON.stringify(origin)}`);
+        logger.debug(`[CORS DEBUG] Allowed origin: ${JSON.stringify(allowedOrigin)}`);
+        logger.debug(`[CORS DEBUG] Request headers: ${JSON.stringify(req.headers)}`);
 
         // Set CORS headers for all requests from allowed origin
         if (origin === allowedOrigin) {
-            console.log("[CORS DEBUG] Setting CORS headers for allowed origin");
+            logger.debug("[CORS DEBUG] Setting CORS headers for allowed origin");
             res.setHeader("Access-Control-Allow-Origin", origin);
             res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
             res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
             res.setHeader("Access-Control-Allow-Credentials", "true");
         } else {
-            console.log("[CORS DEBUG] Origin not allowed:", origin, "!==", allowedOrigin);
+            logger.warn(`[CORS DEBUG] Origin not allowed: ${origin} !== ${allowedOrigin}`);
             // Still set some headers to help debug
             res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
             res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -183,25 +270,25 @@ export const configureMiddleware = (config: Map<string, any>) => {
 
         // Handle OPTIONS preflight requests
         if (req.method === "OPTIONS") {
-            console.log("[CORS DEBUG] Handling OPTIONS preflight request, responding with 204");
+            logger.debug("[CORS DEBUG] Handling OPTIONS preflight request, responding with 204");
             return res.status(204).end();
         }
 
-        console.log("[CORS DEBUG] Continuing to next middleware");
+        logger.debug("[CORS DEBUG] Continuing to next middleware");
         next();
     };
 
     // OPTIONS pre-handler that executes before auth middleware
-    const optionsHandler = (req: any, res: any, next: any) => {
-        console.log("[OPTIONS HANDLER] Request received:", req.method, req.url);
+    const optionsHandler = (req: Request, res: Response, next: NextFunction) => {
+        logger.debug(`[OPTIONS HANDLER] Request received: ${req.method} ${req.url}`);
 
         if (req.method === "OPTIONS") {
             const origin = req.headers.origin;
             const allowedOrigin = getCorsOrigin();
 
-            console.log("[OPTIONS HANDLER] Handling OPTIONS request");
-            console.log("[OPTIONS HANDLER] Origin:", origin);
-            console.log("[OPTIONS HANDLER] Allowed:", allowedOrigin);
+            logger.debug("[OPTIONS HANDLER] Handling OPTIONS request");
+            logger.debug(`[OPTIONS HANDLER] Origin: ${origin}`);
+            logger.debug(`[OPTIONS HANDLER] Allowed: ${allowedOrigin}`);
 
             if (origin === allowedOrigin) {
                 res.setHeader("Access-Control-Allow-Origin", origin);
@@ -210,11 +297,11 @@ export const configureMiddleware = (config: Map<string, any>) => {
                 res.setHeader("Access-Control-Allow-Credentials", "true");
             }
 
-            console.log("[OPTIONS HANDLER] Sending 204 response");
+            logger.debug("[OPTIONS HANDLER] Sending 204 response");
             return res.status(204).end();
         }
 
-        console.log("[OPTIONS HANDLER] Not OPTIONS, continuing to next middleware");
+        logger.debug("[OPTIONS HANDLER] Not OPTIONS, continuing to next middleware");
         next();
     };
 
@@ -226,8 +313,8 @@ export const configureMiddleware = (config: Map<string, any>) => {
     });
 
     // Wrap rate limiter to add debugging
-    const debugRateLimiter = (req: any, res: any, next: any) => {
-        console.log("[MIDDLEWARE DEBUG] Rate limiter middleware called for", req.method, req.url);
+    const debugRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+        logger.debug(`[MIDDLEWARE DEBUG] Rate limiter middleware called for ${req.method} ${req.url}`);
         return rateLimiter(req, res, next);
     };
 
@@ -237,6 +324,6 @@ export const configureMiddleware = (config: Map<string, any>) => {
     config.set("cors", corsMiddleware);
     config.set("rateLimiter", debugRateLimiter);
 
-    console.log("[MIDDLEWARE DEBUG] Final middleware config keys:", Array.from(config.keys()));
+    logger.debug(`[MIDDLEWARE DEBUG] Final middleware config keys: ${Array.from(config.keys()).join(", ")}`);
     return config;
 };

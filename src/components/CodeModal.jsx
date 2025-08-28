@@ -14,7 +14,7 @@ function CodeModal({ show, onHide, codeBlocks, title }) {
     /**
      * Copy text to clipboard with fallback for older browsers
      */
-    const copyToClipboard = async (text, blockId) => {
+    const copyToClipboard = async (text) => {
         try {
             if (navigator.clipboard && window.isSecureContext) {
                 // Modern clipboard API
@@ -70,7 +70,7 @@ function CodeModal({ show, onHide, codeBlocks, title }) {
             })
             .join("\n\n---\n\n");
 
-        copyToClipboard(allCode, "all");
+        copyToClipboard(allCode);
     };
 
     if (!codeBlocks || codeBlocks.length === 0) {

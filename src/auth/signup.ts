@@ -1,10 +1,18 @@
 import { defineUserSignupFields } from "wasp/server/auth";
 
-function validateEmailForUser(data: any): string {
+interface SignupData {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+}
+
+function validateEmailForUser(data: SignupData): string {
+    if (!data.email) throw new Error("Email is required");
     return data.email;
 }
 
-function validateFirstName(data: any): string | undefined {
+function validateFirstName(data: SignupData): string | undefined {
     const firstName = data.firstName;
     if (!firstName || firstName.trim() === "") {
         return undefined;
@@ -18,7 +26,7 @@ function validateFirstName(data: any): string | undefined {
     return firstName.trim();
 }
 
-function validateLastName(data: any): string | undefined {
+function validateLastName(data: SignupData): string | undefined {
     const lastName = data.lastName;
     if (!lastName || lastName.trim() === "") {
         return undefined;
@@ -32,7 +40,7 @@ function validateLastName(data: any): string | undefined {
     return lastName.trim();
 }
 
-function validateUsername(data: any): string | undefined {
+function validateUsername(data: SignupData): string | undefined {
     const username = data.username;
     if (!username || username.trim() === "") {
         return undefined;

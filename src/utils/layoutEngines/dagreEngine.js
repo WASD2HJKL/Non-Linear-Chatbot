@@ -1,5 +1,6 @@
 import dagre from "dagre";
 import { LAYOUT_CONFIG, calculateHorizontalSpacing, calculateVerticalSpacing } from "../../constants/layoutConfig.js";
+import logger from "../clientLogger";
 
 /**
  * Dagre-specific layout engine implementation for ReactFlow integration
@@ -63,12 +64,9 @@ export class DagreLayoutEngine {
             // Debug: Log graph configuration for LR layout
             if (this.direction === "LR") {
                 const graphConfig = this.graph.graph();
-                console.log("Dagre LR Layout Config:", {
-                    direction: this.direction,
-                    nodesep: graphConfig.nodesep,
-                    ranksep: graphConfig.ranksep,
-                    nodeCount: nodes.length,
-                });
+                logger.debug(
+                    `[LAYOUT] Dagre LR Layout Config: direction=${this.direction}, nodesep=${graphConfig.nodesep}, ranksep=${graphConfig.ranksep}, nodeCount=${nodes.length}`,
+                );
             }
 
             // Run dagre layout algorithm
@@ -88,7 +86,9 @@ export class DagreLayoutEngine {
 
                     // Debug: Log node positions for LR layout
                     if (this.direction === "LR") {
-                        console.log(`Node ${node.id}: dagre(${dagreNode.x}, ${dagreNode.y}) -> reactflow(${x}, ${y})`);
+                        logger.debug(
+                            `[LAYOUT] Node ${node.id}: dagre(${dagreNode.x}, ${dagreNode.y}) -> reactflow(${x}, ${y})`,
+                        );
                     }
                 }
             }

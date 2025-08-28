@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "react-bootstrap";
 
-function ExportButton({ conversationTree, nodePositions, activeBranchId, onExport }) {
+function ExportButton({ onExport }) {
     const handleExportClick = () => {
         if (onExport) {
             onExport();

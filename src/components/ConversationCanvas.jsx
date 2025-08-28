@@ -8,6 +8,7 @@ import { useMeasureNodeDimensions } from "../hooks/useMeasureNodeDimensions.js";
 import ExportButton from "./ExportButton";
 import ExportModal from "./ExportModal";
 import { useAuth } from "wasp/client/auth";
+import logger from "../utils/clientLogger";
 import { updateNodeExpanded } from "wasp/client/operations";
 import exportConversation from "../services/conversationExporter";
 
@@ -22,6 +23,7 @@ function ConversationCanvas({
     onNodeSelect,
     onNodePositionUpdate,
     onNodeWidthUpdate,
+    onNodeDelete,
     onRefresh,
 }) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -40,13 +42,15 @@ function ConversationCanvas({
     const onNodeSelectRef = useRef(onNodeSelect);
     const onNodePositionUpdateRef = useRef(onNodePositionUpdate);
     const onNodeWidthUpdateRef = useRef(onNodeWidthUpdate);
+    const onNodeDeleteRef = useRef(onNodeDelete);
 
     // Update refs when callbacks change
     useEffect(() => {
         onNodeSelectRef.current = onNodeSelect;
         onNodePositionUpdateRef.current = onNodePositionUpdate;
         onNodeWidthUpdateRef.current = onNodeWidthUpdate;
-    }, [onNodeSelect, onNodePositionUpdate, onNodeWidthUpdate]);
+        onNodeDeleteRef.current = onNodeDelete;
+    }, [onNodeSelect, onNodePositionUpdate, onNodeWidthUpdate, onNodeDelete]);
 
     // Convert nodes to ReactFlow format and handle positioning
     useEffect(() => {
@@ -126,6 +130,7 @@ function ConversationCanvas({
                             throw error;
                         }
                     },
+                    onDelete: onNodeDeleteRef.current,
                 },
             }));
 
@@ -146,7 +151,7 @@ function ConversationCanvas({
             setNodes([]);
             setEdges([]);
         }
-    }, [conversationNodes, activeNodeId]);
+    }, [conversationNodes, activeNodeId, measureRef, setNodes, setEdges]);
 
     // Handle node click
     const onNodeClick = useCallback((event, node) => {
@@ -177,7 +182,7 @@ function ConversationCanvas({
         try {
             // Wait for dimensions to be ready if still measuring
             if (!isReady) {
-                console.log("Waiting for node dimensions to be measured...");
+                logger.debug("[CANVAS] Waiting for node dimensions to be measured...");
                 // Give a short delay for measurements to complete
                 await new Promise((resolve) => setTimeout(resolve, 100));
             }
@@ -264,7 +269,7 @@ function ConversationCanvas({
                 }),
             );
         }
-    }, [conversationNodes, updateNodeExpanded, handleAutoLayout, setNodes]);
+    }, [conversationNodes, handleAutoLayout, setNodes, onRefresh]);
 
     // Handle collapse all nodes
     const handleCollapseAll = useCallback(async () => {
@@ -307,7 +312,7 @@ function ConversationCanvas({
                 }),
             );
         }
-    }, [conversationNodes, updateNodeExpanded, handleAutoLayout, setNodes]);
+    }, [conversationNodes, handleAutoLayout, setNodes, onRefresh]);
 
     // Handle export button click
     const handleExportClick = useCallback(() => {
@@ -332,16 +337,9 @@ function ConversationCanvas({
                 });
 
                 // Debug: log the data being passed to export
-                console.log("Export data:", {
-                    visibleNodes: visibleNodes.map((n) => ({
-                        id: n.id,
-                        x: n.x,
-                        y: n.y,
-                        parentId: n.parentId,
-                        userMessage: n.userMessage?.substring(0, 20),
-                    })),
-                    nodePositions,
-                });
+                logger.debug(
+                    `[CANVAS] Export data: ${visibleNodes.length} visible nodes, ${Object.keys(nodePositions).length} positioned nodes`,
+                );
 
                 const htmlContent = await exportConversation({
                     conversationNodes: visibleNodes,
@@ -374,11 +372,7 @@ function ConversationCanvas({
     return (
         <div className="conversation-canvas">
             <div className="canvas-toolbar">
-                <ExportButton
-                    conversationNodes={conversationNodes || []}
-                    activeNodeId={activeNodeId}
-                    onExport={handleExportClick}
-                />
+                <ExportButton onExport={handleExportClick} />
                 <Button
                     variant="secondary"
                     size="sm"
@@ -423,13 +417,7 @@ function ConversationCanvas({
                 <MiniMap />
             </ReactFlow>
 
-            <ExportModal
-                show={showExportModal}
-                onHide={handleExportModalClose}
-                conversationNodes={conversationNodes || []}
-                user={user}
-                onExport={handleExport}
-            />
+            <ExportModal show={showExportModal} onHide={handleExportModalClose} onExport={handleExport} />
         </div>
     );
 }

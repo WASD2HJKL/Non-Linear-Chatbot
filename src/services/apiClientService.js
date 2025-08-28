@@ -1,6 +1,7 @@
 import configService from "./configService";
 import { getSessionId } from "wasp/client/api";
 import storageService from "../utils/storageService";
+import logger from "../utils/clientLogger";
 
 // API Client Factory
 class ApiClientService {
@@ -58,7 +59,7 @@ class ApiClientService {
         }
 
         const apiBaseUrl = import.meta.env.REACT_APP_API_URL || "";
-        const response = await fetch(`${apiBaseUrl}/api/openai/stream`, {
+        const response = await fetch(`${apiBaseUrl}/api/ai/stream`, {
             method: "POST",
             headers,
             credentials: "include", // Include cookies as backup
@@ -66,6 +67,7 @@ class ApiClientService {
                 messages: filteredMessages,
                 conversationId: options.conversationId || undefined,
                 model: this.currentModel,
+                provider: this.currentProvider, // Include provider for multi-provider support
             }),
         });
 
@@ -74,11 +76,11 @@ class ApiClientService {
             try {
                 const errorData = await response.json();
                 errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (parseError) {
+            } catch (_parseError) {
                 // If we can't parse JSON, use the response text
                 try {
                     errorMessage = (await response.text()) || errorMessage;
-                } catch (textError) {
+                } catch (_textError) {
                     // If we can't get text either, use the status
                     errorMessage = `HTTP ${response.status} - ${response.statusText}`;
                 }
@@ -145,8 +147,19 @@ class ApiClientService {
                             if (buffer.trim()) {
                                 try {
                                     const data = JSON.parse(buffer);
+                                    // Handle both direct delta format and OpenAI-compatible format
                                     if (data && typeof data.delta !== "undefined") {
+                                        // Direct delta format: {"delta": "content"}
                                         lineQueue.push(data);
+                                    } else if (
+                                        data &&
+                                        data.choices &&
+                                        data.choices[0] &&
+                                        data.choices[0].delta &&
+                                        data.choices[0].delta.content
+                                    ) {
+                                        // OpenAI-compatible format: {"choices":[{"delta":{"content":"..."}}]}
+                                        lineQueue.push({ delta: data.choices[0].delta.content });
                                     }
                                 } catch (err) {
                                     console.warn("Invalid final NDJSON line:", { line: buffer, error: err.message });
@@ -175,9 +188,26 @@ class ApiClientService {
                             if (line.trim()) {
                                 try {
                                     const data = JSON.parse(line);
-                                    // Validate expected structure before queuing
+                                    logger.debug(`[CLIENT DEBUG] Parsed NDJSON line: ${JSON.stringify(data)}`);
+                                    // Handle both direct delta format and OpenAI-compatible format
                                     if (data && typeof data.delta !== "undefined") {
+                                        // Direct delta format: {"delta": "content"}
+                                        logger.debug(
+                                            `[CLIENT DEBUG] Using direct delta format: ${JSON.stringify(data.delta)}`,
+                                        );
                                         lineQueue.push(data);
+                                    } else if (
+                                        data &&
+                                        data.choices &&
+                                        data.choices[0] &&
+                                        data.choices[0].delta &&
+                                        data.choices[0].delta.content
+                                    ) {
+                                        // OpenAI-compatible format: {"choices":[{"delta":{"content":"..."}}]}
+                                        logger.debug(
+                                            `[CLIENT DEBUG] Using OpenAI format, content: ${data.choices[0].delta.content}`,
+                                        );
+                                        lineQueue.push({ delta: data.choices[0].delta.content });
                                     } else {
                                         console.warn("NDJSON line missing delta field:", line);
                                     }

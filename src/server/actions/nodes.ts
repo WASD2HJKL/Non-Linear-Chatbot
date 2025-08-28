@@ -5,9 +5,13 @@ import type {
     UpdateNodeWidth,
     UpdateNodeExpanded,
     UpdateNodePinned,
+    DeleteNode,
 } from "wasp/server/operations";
-import { openai } from "../services/openaiClient";
-import { isValidOpenAIModel } from "../services/configService";
+import { generateSummary } from "../services/summaryService";
+import { updateConversationTitle } from "../services/conversationTitleService";
+import logger from "../utils/logger";
+import crypto from "crypto";
+import type { Node as DbNode } from "@prisma/client";
 
 type CreateNodeInput = {
     conversationId: string;
@@ -45,15 +49,20 @@ type UpdatePinnedInput = {
     isPinned: boolean;
 };
 
+type DeleteNodeInput = {
+    nodeId: string;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function computeNodePath(nodeId: string, parentId: string | null, context: any): Promise<string[]> {
     const path: string[] = [];
     let currentId = parentId;
 
     while (currentId) {
-        const parentNode = await context.entities.Node.findUnique({
+        const parentNode = (await context.entities.Node.findUnique({
             where: { id: currentId },
             select: { id: true, parentId: true },
-        });
+        })) as { id: string; parentId: string | null } | null;
 
         if (!parentNode) {
             throw new HttpError(400, "Invalid parent reference");
@@ -67,78 +76,24 @@ async function computeNodePath(nodeId: string, parentId: string | null, context:
     return path;
 }
 
-async function generateSummary(
-    userMessage: string,
-    assistantMessage: string,
-): Promise<{ summary: string; tokensUsed: number }> {
-    const model = process.env.SUMMARY_MODEL || "gpt-4.1-mini";
-    const maxTokens = parseInt(process.env.SUMMARY_TOKEN || "100");
-    const systemPrompt = process.env.SUMMARY_PROMPT || "Summarize the following conversation:";
-
-    // Validate model
-    if (!isValidOpenAIModel(model)) {
-        throw new HttpError(500, `Invalid SUMMARY_MODEL: ${model}`);
-    }
-
-    const messages = [
-        { role: "system" as const, content: systemPrompt },
-        { role: "user" as const, content: userMessage },
-        { role: "assistant" as const, content: assistantMessage },
-    ];
-
-    try {
-        if (process.env.NODE_ENV === "development") {
-            console.log("[SUMMARY] Model:", model);
-            console.log("[SUMMARY] Prompt:", systemPrompt);
-            console.log("[SUMMARY] Max tokens:", maxTokens);
-        }
-
-        const start = Date.now();
-        const response = await openai.chat.completions.create({
-            model,
-            messages,
-            max_completion_tokens: maxTokens,
-            stream: false,
-        });
-
-        const summary = response.choices[0]?.message?.content?.trim() || "";
-        const tokensUsed = response.usage?.total_tokens || 0;
-
-        if (process.env.NODE_ENV === "development") {
-            console.log(`[SUMMARY] Generated in ${Date.now() - start}ms`);
-            console.log("[SUMMARY] Response:", summary);
-            console.log("[SUMMARY] Tokens used:", tokensUsed);
-        }
-
-        return { summary, tokensUsed };
-    } catch (error: any) {
-        console.error("[SUMMARY] OpenAI error:", error);
-
-        if (process.env.NODE_ENV === "development") {
-            throw new HttpError(500, `OpenAI error: ${error.message}`);
-        } else {
-            throw new HttpError(500, "Failed to create node. Please try again.");
-        }
-    }
-}
-
-export const createNode: CreateNode<CreateNodeInput, any> = async (args, context) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createNode: CreateNode<CreateNodeInput, DbNode> = async (args, context: any) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
-    const conversation = await context.entities.Conversation.findFirst({
+    const conversation = (await context.entities.Conversation.findFirst({
         where: { id: args.conversationId, userId: context.user.id },
-    });
+    })) as { id: string } | null;
 
     if (!conversation) throw new HttpError(404, "Conversation not found");
 
     if (args.parentId) {
-        const parentNode = await context.entities.Node.findFirst({
+        const parentNode = (await context.entities.Node.findFirst({
             where: {
                 id: args.parentId,
                 conversationId: args.conversationId,
                 userId: context.user.id,
             },
-        });
+        })) as { id: string } | null;
 
         if (!parentNode) throw new HttpError(404, "Parent node not found");
     }
@@ -150,10 +105,10 @@ export const createNode: CreateNode<CreateNodeInput, any> = async (args, context
     const { summary, tokensUsed } = await generateSummary(args.userMessage, args.assistantMessage);
 
     if (process.env.NODE_ENV === "development") {
-        console.log(`[NODE_CREATE] Generated summary for node ${nodeId}, tokens used: ${tokensUsed}`);
+        logger.info(`[NODE_CREATE] Generated summary for node ${nodeId}, tokens used: ${tokensUsed}`);
     }
 
-    return await context.entities.Node.create({
+    const createdNode = (await context.entities.Node.create({
         data: {
             id: nodeId,
             conversationId: args.conversationId,
@@ -169,20 +124,34 @@ export const createNode: CreateNode<CreateNodeInput, any> = async (args, context
             path: path,
             visible: true,
         },
-    });
+    })) as DbNode;
+
+    // Update conversation title if this is a root node
+    if (!args.parentId) {
+        try {
+            await updateConversationTitle(args.conversationId, context);
+        } catch (error: unknown) {
+            const err = error as Error;
+            console.error("[NODE_CREATE] Error updating conversation title:", err);
+            // Don't throw to prevent node creation failure
+        }
+    }
+
+    return createdNode;
 };
 
-export const updateNodePositions: UpdateNodePositions<UpdatePositionsInput, any> = async (args, context) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const updateNodePositions: UpdateNodePositions<UpdatePositionsInput, DbNode[]> = async (args, context: any) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
     const nodeIds = args.updates.map((u) => u.nodeId);
 
-    const nodes = await context.entities.Node.findMany({
+    const nodes = (await context.entities.Node.findMany({
         where: {
             id: { in: nodeIds },
             userId: context.user.id,
         },
-    });
+    })) as Array<{ id: string }>;
 
     if (nodes.length !== nodeIds.length) {
         throw new HttpError(404, "One or more nodes not found");
@@ -195,10 +164,11 @@ export const updateNodePositions: UpdateNodePositions<UpdatePositionsInput, any>
         }),
     );
 
-    return await Promise.all(updatePromises);
+    return (await Promise.all(updatePromises)) as DbNode[];
 };
 
-export const updateNodeWidth: UpdateNodeWidth<UpdateWidthInput, any> = async (args, context) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const updateNodeWidth: UpdateNodeWidth<UpdateWidthInput, DbNode[]> = async (args, context: any) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
     const nodeIds = args.updates.map((u) => u.nodeId);
@@ -210,12 +180,12 @@ export const updateNodeWidth: UpdateNodeWidth<UpdateWidthInput, any> = async (ar
         }
     }
 
-    const nodes = await context.entities.Node.findMany({
+    const nodes = (await context.entities.Node.findMany({
         where: {
             id: { in: nodeIds },
             userId: context.user.id,
         },
-    });
+    })) as Array<{ id: string }>;
 
     if (nodes.length !== nodeIds.length) {
         throw new HttpError(404, "One or more nodes not found");
@@ -228,45 +198,119 @@ export const updateNodeWidth: UpdateNodeWidth<UpdateWidthInput, any> = async (ar
         }),
     );
 
-    return await Promise.all(updatePromises);
+    return (await Promise.all(updatePromises)) as DbNode[];
 };
 
-export const updateNodeExpanded: UpdateNodeExpanded<UpdateExpandedInput, any> = async (args, context) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const updateNodeExpanded: UpdateNodeExpanded<UpdateExpandedInput, DbNode> = async (args, context: any) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
-    const node = await context.entities.Node.findFirst({
+    const node = (await context.entities.Node.findFirst({
         where: {
             id: args.nodeId,
             userId: context.user.id,
         },
-    });
+    })) as DbNode | null;
 
     if (!node) {
         throw new HttpError(404, "Node not found");
     }
 
-    return await context.entities.Node.update({
+    return (await context.entities.Node.update({
         where: { id: args.nodeId },
         data: { expanded: args.expanded },
-    });
+    })) as DbNode;
 };
 
-export const updateNodePinned: UpdateNodePinned<UpdatePinnedInput, any> = async (args, context) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const updateNodePinned: UpdateNodePinned<UpdatePinnedInput, DbNode> = async (args, context: any) => {
     if (!context.user) throw new HttpError(401, "Unauthorized");
 
-    const node = await context.entities.Node.findFirst({
+    const node = (await context.entities.Node.findFirst({
         where: {
             id: args.nodeId,
             userId: context.user.id,
         },
-    });
+    })) as DbNode | null;
 
     if (!node) {
         throw new HttpError(404, "Node not found");
     }
 
-    return await context.entities.Node.update({
+    return (await context.entities.Node.update({
         where: { id: args.nodeId },
         data: { isPinned: args.isPinned },
+    })) as DbNode;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const deleteNode: DeleteNode<DeleteNodeInput, void> = async (args, context: any) => {
+    if (!context.user) throw new HttpError(401, "Unauthorized");
+
+    // Verify the node exists and belongs to the user
+    const targetNode = (await context.entities.Node.findFirst({
+        where: {
+            id: args.nodeId,
+            userId: context.user.id,
+        },
+    })) as { id: string; parentId: string | null; conversationId: string } | null;
+
+    if (!targetNode) {
+        throw new HttpError(404, "Node not found");
+    }
+
+    // Check if target is root node before deletion
+    const isRootNode = targetNode.parentId === null;
+
+    // Find all descendants using the path field
+    // The path field contains an array of ancestor node IDs
+    // Any node that has the target nodeId in its path is a descendant
+    const allNodes = (await context.entities.Node.findMany({
+        where: {
+            conversationId: targetNode.conversationId,
+            userId: context.user.id,
+        },
+        select: {
+            id: true,
+            path: true,
+        },
+    })) as Array<{ id: string; path?: unknown }>;
+
+    // Identify all descendants by checking if target nodeId is in their path
+    const nodeIdsToDelete = [args.nodeId]; // Include the target node itself
+
+    for (const node of allNodes) {
+        if (node.path && Array.isArray(node.path)) {
+            // Check if the target node ID is in this node's path
+            if (node.path.includes(args.nodeId)) {
+                nodeIdsToDelete.push(node.id);
+            }
+        }
+    }
+
+    // Batch update all identified nodes to set visible to false
+    await context.entities.Node.updateMany({
+        where: {
+            id: { in: nodeIdsToDelete },
+            userId: context.user.id,
+        },
+        data: {
+            visible: false,
+        },
     });
+
+    // Update conversation title if root node was deleted
+    if (isRootNode) {
+        try {
+            await updateConversationTitle(targetNode.conversationId, context);
+        } catch (error: unknown) {
+            const err = error as Error;
+            console.error("[NODE_DELETE] Error updating conversation title:", err);
+            // Don't throw to prevent deletion failure
+        }
+    }
+
+    if (process.env.NODE_ENV === "development") {
+        logger.info(`[NODE_DELETE] Soft deleted node ${args.nodeId} and ${nodeIdsToDelete.length - 1} descendants`);
+    }
 };

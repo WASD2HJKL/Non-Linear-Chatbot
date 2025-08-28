@@ -5,14 +5,18 @@ import { getConversations } from "../client/operations/conversations";
 import { Button, Card, Container, Row, Col, Spinner, Alert, Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import Settings from "./Settings";
+import ConversationDeleteModal from "./ConversationDeleteModal";
 import configService from "../services/configService";
 import apiClientService from "../services/apiClientService";
+import conversationService from "../services/conversationService";
 
 export default function ConversationList() {
     const { data: user, isLoading: isAuthLoading } = useAuth();
     const { data: conversations, isLoading: conversationsLoading, error } = useQuery(getConversations);
     const [showSettings, setShowSettings] = useState(false);
-    const [apiSettings, setApiSettings] = useState({
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [conversationToDelete, setConversationToDelete] = useState(null);
+    const [_apiSettings, setApiSettings] = useState({
         provider: configService.getApiConfig().defaultProvider,
         model: configService.getApiConfig().defaultModel,
         apiKey: "server-managed",
@@ -30,9 +34,9 @@ export default function ConversationList() {
         try {
             apiClientService.setClient(newSettings.provider, newSettings.model, newSettings.apiKey);
             setApiSettings(newSettings);
-        } catch (error) {
-            console.error("Failed to apply settings:", error);
-            alert("Failed to apply settings: " + error.message);
+        } catch (_error) {
+            console.error("Failed to apply settings:", _error);
+            alert("Failed to apply settings: " + (_error?.message || "unknown error"));
         }
     };
 
@@ -49,6 +53,28 @@ export default function ConversationList() {
     // Handle logout
     const handleLogout = () => {
         logout();
+    };
+
+    // Handle delete button click
+    const handleDeleteClick = (conversation, e) => {
+        e.stopPropagation();
+        setConversationToDelete(conversation);
+        setShowDeleteModal(true);
+    };
+
+    // Handle delete confirmation
+    const handleConfirmDelete = async () => {
+        if (!conversationToDelete) return;
+
+        try {
+            await conversationService.deleteConversation(conversationToDelete.id);
+            setShowDeleteModal(false);
+            setConversationToDelete(null);
+            // The conversation list will automatically refresh via the query
+        } catch (error) {
+            console.error("Failed to delete conversation:", error);
+            alert("Failed to delete conversation. Please try again.");
+        }
     };
 
     // Render user profile dropdown
@@ -175,30 +201,67 @@ export default function ConversationList() {
                 <Row>
                     {conversations.map((conversation) => (
                         <Col key={conversation.id} md={6} lg={4} className="mb-3">
-                            <Card
-                                className="h-100 cursor-pointer"
-                                onClick={() => handleConversationClick(conversation.id)}
-                                style={{ cursor: "pointer" }}
-                            >
-                                <Card.Body>
-                                    <Card.Title className="text-truncate">
-                                        {conversation.title || "Untitled Conversation"}
-                                    </Card.Title>
-                                    <Card.Text className="text-muted">
-                                        {conversation.nodes && conversation.nodes.length > 0 ? (
-                                            <small>
-                                                {conversation.nodes.length} message
-                                                {conversation.nodes.length !== 1 ? "s" : ""}
-                                            </small>
-                                        ) : (
-                                            <small>No messages yet</small>
-                                        )}
-                                    </Card.Text>
-                                    <Card.Text>
-                                        <small className="text-muted">{formatDate(conversation.updatedAt)}</small>
-                                    </Card.Text>
-                                </Card.Body>
-                            </Card>
+                            <div className="position-relative">
+                                <Card
+                                    className="h-100 cursor-pointer"
+                                    onClick={() => handleConversationClick(conversation.id)}
+                                    style={{ cursor: "pointer" }}
+                                >
+                                    <Card.Body>
+                                        <Card.Title className="text-truncate">
+                                            {conversation.title || "Untitled Conversation"}
+                                        </Card.Title>
+                                        <Card.Text className="text-muted">
+                                            {conversation.nodes && conversation.nodes.length > 0 ? (
+                                                <small>
+                                                    {conversation.nodes.length} message
+                                                    {conversation.nodes.length !== 1 ? "s" : ""}
+                                                </small>
+                                            ) : (
+                                                <small>No messages yet</small>
+                                            )}
+                                        </Card.Text>
+                                        <Card.Text>
+                                            <small className="text-muted">{formatDate(conversation.updatedAt)}</small>
+                                        </Card.Text>
+                                    </Card.Body>
+                                </Card>
+                                <Dropdown className="position-absolute" style={{ top: "8px", right: "8px" }}>
+                                    <Dropdown.Toggle
+                                        as={Button}
+                                        variant="link"
+                                        className="p-1 border-0 shadow-none"
+                                        id={`conversation-dropdown-${conversation.id}`}
+                                        style={{
+                                            backgroundColor: "transparent",
+                                            color: "var(--bs-gray-600)",
+                                            fontSize: "16px",
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: "20px",
+                                                height: "20px",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            ⋮
+                                        </div>
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu>
+                                        <Dropdown.Item
+                                            onClick={(e) => handleDeleteClick(conversation, e)}
+                                            className="text-danger"
+                                        >
+                                            Delete
+                                        </Dropdown.Item>
+                                    </Dropdown.Menu>
+                                </Dropdown>
+                            </div>
                         </Col>
                     ))}
                 </Row>
@@ -214,6 +277,17 @@ export default function ConversationList() {
 
             {/* Settings Modal */}
             <Settings show={showSettings} onHide={() => setShowSettings(false)} onApply={handleApplySettings} />
+
+            {/* Delete Confirmation Modal */}
+            <ConversationDeleteModal
+                show={showDeleteModal}
+                onHide={() => {
+                    setShowDeleteModal(false);
+                    setConversationToDelete(null);
+                }}
+                onConfirm={handleConfirmDelete}
+                conversationTitle={conversationToDelete?.title || "Untitled Conversation"}
+            />
         </Container>
     );
 }

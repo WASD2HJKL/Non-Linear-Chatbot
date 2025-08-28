@@ -13,6 +13,7 @@ export const StreamRequestSchema = z.object({
     messages: MessagesArraySchema,
     conversationId: z.string().uuid().optional(),
     model: z.string().min(1).max(50),
+    provider: z.string().min(1).max(50).optional(),
 });
 
 export type MessageRole = z.infer<typeof MessageRoleSchema>;

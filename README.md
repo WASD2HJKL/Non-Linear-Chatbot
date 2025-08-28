@@ -2,9 +2,11 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/WASD2HJKL/Non-Linear-Chatbot?style=for-the-badge&logo=github&label=Stars&logoColor=white&color=ffda65)](https://github.com/WASD2HJKL/Non-Linear-Chatbot/stargazers)
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A revolutionary conversational AI application that breaks free from traditional linear chat interfaces. Create branching conversation trees, explore multiple dialogue paths, and visualize your conversations as interactive node graphs.
 
-![Version](https://img.shields.io/badge/version-0.1.0--beta-blue)
+![Version](https://img.shields.io/badge/version-0.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
 ![Wasp](https://img.shields.io/badge/wasp-0.17.0-yellow)
@@ -23,13 +25,18 @@ A revolutionary conversational AI application that breaks free from traditional 
 - Drag-and-drop nodes to organize your conversation map
 - Resizable panels for optimal viewing experience
 - Visual path highlighting for active conversation threads
+- Expand All/Collapse All buttons for managing large conversation trees
 
 ### 🤖 AI Integration
 
-- Server-side OpenAI streaming for secure API key management
-- Support for multiple GPT-4o model variants
+- Multi-provider AI support with OpenAI-compatible API interfaces
+- Server-side streaming for secure API key management
+- Support for OpenAI, Gemini, OpenRouter, and other cloud providers
+- **Local AI model support** for development (Ollama, phi3-mini, etc.)
+- Local agent configuration for development environments
 - Real-time response streaming with queue-based NDJSON parsing
-- Configurable model selection through user-friendly settings
+- Configurable provider and model selection through user-friendly settings
+- Unified error handling and normalization across providers
 
 ### 🎨 Modern UI/UX
 
@@ -49,41 +56,70 @@ A revolutionary conversational AI application that breaks free from traditional 
 
 - Node.js 22 or higher
 - PostgreSQL database
-- OpenAI API key
+- OpenAI API key (or compatible provider API key)
+- **Optional:** Docker and Docker Compose for local AI models
+
+> **Note**: This application supports any AI provider with OpenAI-compatible API endpoints. All providers must use the standard `Authorization: Bearer <api-key>` header format for authentication.
 
 ### Installation
 
 1. **Clone the repository**
 
-   ```bash
-   git clone https://github.com/WASD2HJKL/Non-Linear-Chatbot.git
-   cd Non-Linear-Chatbot
-   ```
+    ```bash
+    git clone https://github.com/WASD2HJKL/Non-Linear-Chatbot.git
+    cd Non-Linear-Chatbot
+    ```
 
 2. **Set up environment variables**
 
-   ```bash
-   cp .env.server.example .env.server
-   ```
+    ```bash
+    cp .env.server.example .env.server
+    ```
 
-   Edit `.env.server` and add your configuration:
+    Edit `.env.server` and add your configuration:
 
-   ```env
-   OPENAI_API_KEY=your_openai_api_key_here
-   # Optional: Google OAuth
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
-   ```
+    ```env
+    # AI Provider API Keys (convention-based naming)
+    OPENAI_API_KEY=your_openai_api_key_here
+    GEMINI_API_KEY=your_gemini_api_key_here
+    HUGGINGFACE_API_KEY=hf_your_huggingface_token_here
+
+    # Optional: Google OAuth
+    GOOGLE_CLIENT_ID=your_google_client_id
+    GOOGLE_CLIENT_SECRET=your_google_client_secret
+    ```
 
 3. **Start the development server**
 
-   ```bash
-   wasp start
-   ```
+    ```bash
+    wasp start
+    ```
 
 4. **Access the application**
 
-   Open http://localhost:3000 in your browser
+    Open http://localhost:3000 in your browser
+
+### Local AI Models (Development Only)
+
+For development with local AI models instead of cloud APIs:
+
+📖 **See [LOCAL_SETUP.md](./LOCAL_SETUP.md)** for comprehensive setup instructions
+
+**Quick Start with Docker:**
+
+```bash
+# Start local Ollama service
+cd docker/local-models
+docker-compose up -d
+
+# Download phi3-mini model
+docker-compose exec ollama ollama pull phi3:mini
+
+# Add to .env.server
+echo "OLLAMA_API_KEY=local-dummy-key" >> .env.server
+```
+
+> ⚠️ **Development Only:** Local AI models are for development environments only. Production deployments use cloud providers.
 
 ### Production Build
 
@@ -112,7 +148,7 @@ Non-Linear-Chatbot/
 │   │   ├── actions/       # Server-side mutations
 │   │   ├── queries/       # Server-side queries
 │   │   ├── middleware/    # Express middleware
-│   │   └── openaiStream.ts # Streaming endpoint
+│   │   └── openaiStream.ts # Multi-provider AI streaming endpoint
 │   ├── services/          # Business logic services
 │   ├── styles/            # CSS files
 │   └── utils/             # Utility functions
@@ -122,9 +158,74 @@ Non-Linear-Chatbot/
 ### Key Design Patterns
 
 - **Node-based conversation storage**: Each message pair is a node in the tree
+- **Multi-provider AI architecture**: Unified client factory supporting OpenAI-compatible APIs
 - **Centralized storage service**: Consistent localStorage handling with migration support
 - **Queue-based streaming**: Robust NDJSON parsing preventing data loss
 - **Component modularity**: Reusable UI components with clear separation of concerns
+- **Error normalization**: Standardized error handling across different AI providers
+
+## ⚙️ Provider Configuration
+
+The application supports multiple AI providers through a unified configuration system. All providers must support OpenAI-compatible API endpoints.
+
+### Adding New Providers
+
+Edit `src/config.js` to add new providers:
+
+```javascript
+providers: [
+    {
+        id: "openai",
+        name: "OpenAI",
+        url: "https://api.openai.com/v1",
+        timeout: 30000,
+        retries: 3,
+        models: [
+            { id: "gpt-4o", name: "GPT-4o" },
+            { id: "gpt-4.1", name: "GPT-4.1" },
+            { id: "gpt-5-chat-latest", name: "GPT-5 Chat" },
+            { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+            { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+            { id: "gpt-4.1-nano", name: "GPT-4.1 Nano (Thinking - may be buggy)" },
+            { id: "gpt-5", name: "GPT-5 (Thinking)" },
+            { id: "gpt-5-mini", name: "GPT-5 Mini" },
+            { id: "o4-mini", name: "O4 Mini" },
+        ],
+    },
+    {
+        id: "huggingface",
+        name: "Hugging Face",
+        url: "https://router.huggingface.co/v1",
+        timeout: 30000,
+        retries: 3,
+        models: [
+            { id: "deepseek-ai/DeepSeek-R1:together", name: "DeepSeek R1" },
+            { id: "meta-llama/Llama-3.2-90B-Vision-Instruct", name: "Llama 3.2 90B Vision" },
+        ],
+    },
+];
+```
+
+### Requirements
+
+- **API Compatibility**: Must support OpenAI's chat completions API format
+- **Authentication**: Must use `Authorization: Bearer <api-key>` header format
+- **Streaming**: Must support server-sent events for real-time responses
+- **Error Format**: Errors will be automatically normalized to a standard format
+
+### API Key Configuration
+
+The application uses a convention-based system for API keys:
+
+**Convention**: `{PROVIDER_ID}_API_KEY`
+
+Examples:
+
+- OpenAI: `OPENAI_API_KEY=sk-your_key_here`
+- Gemini: `GEMINI_API_KEY=your_gemini_key_here`
+- Hugging Face: `HUGGINGFACE_API_KEY=hf_your_token_here`
+
+**Backward Compatibility**: If a provider-specific key is not found, the system falls back to `OPENAI_API_KEY`. This ensures existing setups continue working without changes.
 
 ## 🌐 Deployment
 
@@ -209,4 +310,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Contact
 
-Project Link: [https://github.com/HongzhengL/Non-Linear-LLM-Chat](https://github.com/HongzhengL/Non-Linear-LLM-Chat)
+Project Link: [https://github.com/WASD2HJKL/Non-Linear-Chatbot](https://github.com/WASD2HJKL/Non-Linear-Chatbot)

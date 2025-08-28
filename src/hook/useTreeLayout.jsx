@@ -4,6 +4,23 @@ import { createLayoutService } from "../services/layoutService.js";
 // This utility organizes nodes in a tree layout with context-awareness
 export function useTreeLayout() {
     const layoutService = createLayoutService("dagre");
+    // Create fallback layout for error cases
+    const _createFallbackLayout = useCallback((nodes) => {
+        const positions = {};
+        const gridCols = Math.ceil(Math.sqrt(nodes.length));
+
+        nodes.forEach((node, index) => {
+            const col = index % gridCols;
+            const row = Math.floor(index / gridCols);
+            positions[node.id] = {
+                x: col * 350,
+                y: row * 200,
+            };
+        });
+
+        return positions;
+    }, []);
+
     // Calculate layout for conversation nodes using modern layout service
     const calculateTreeLayout = useCallback(
         async (nodes, dimensions = new Map(), options = {}) => {
@@ -49,25 +66,8 @@ export function useTreeLayout() {
                 return _createFallbackLayout(nodes);
             }
         },
-        [layoutService],
+        [layoutService, _createFallbackLayout],
     );
-
-    // Create fallback layout for error cases
-    const _createFallbackLayout = useCallback((nodes) => {
-        const positions = {};
-        const gridCols = Math.ceil(Math.sqrt(nodes.length));
-
-        nodes.forEach((node, index) => {
-            const col = index % gridCols;
-            const row = Math.floor(index / gridCols);
-            positions[node.id] = {
-                x: col * 350,
-                y: row * 200,
-            };
-        });
-
-        return positions;
-    }, []);
 
     return { calculateTreeLayout, _createFallbackLayout };
 }

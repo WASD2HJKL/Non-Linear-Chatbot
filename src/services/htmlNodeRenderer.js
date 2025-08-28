@@ -1,7 +1,7 @@
-import coordinateMapper from "../utils/coordinateMapper";
 import { marked } from "marked";
+import logger from "../utils/clientLogger";
 
-function generateHTMLNodes(conversationTree, nodePositions, isFullTree, crossRefMap, containerDimensions) {
+function generateHTMLNodes(conversationTree, nodePositions, isFullTree, crossRefMap, _containerDimensions) {
     if (!conversationTree || Object.keys(conversationTree).length === 0) {
         return "";
     }
@@ -87,11 +87,8 @@ function generateHTMLNodes(conversationTree, nodePositions, isFullTree, crossRef
         // No need to adjust here as positions are already adjusted
 
         // Debug: log the position being used
-        console.log(
-            `Node ${branch.id.substring(0, 8)} position:`,
-            position,
-            `isFullTree: ${isFullTree}`,
-            `parentId: ${branch.parentId}`,
+        logger.debug(
+            `[HTML_RENDERER] Node ${branch.id.substring(0, 8)} position: ${JSON.stringify(position)}, isFullTree: ${isFullTree}, parentId: ${branch.parentId}`,
         );
 
         // Generate unique node ID for cross-referencing

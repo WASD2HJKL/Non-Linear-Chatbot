@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { User } from "@prisma/client";
+import type { User } from "@prisma/client";
 
 export interface AuthenticatedRequest extends Request {
     user?: User;
@@ -8,9 +8,9 @@ export interface AuthenticatedRequest extends Request {
 export interface WaspContext {
     user?: User;
     entities?: {
-        User?: any;
-        Conversation?: any;
-        Node?: any;
+        User?: unknown;
+        Conversation?: unknown;
+        Node?: unknown;
     };
 }
 

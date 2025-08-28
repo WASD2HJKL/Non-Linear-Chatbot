@@ -1,4 +1,10 @@
-import { createNode, updateNodePositions, updateNodeWidth, getConversationNodes } from "../client/operations/nodes";
+import {
+    createNode,
+    updateNodePositions,
+    updateNodeWidth,
+    deleteNode,
+    getConversationNodes,
+} from "../client/operations/nodes";
 import { reconstructMessagesFromPath } from "../utils/messageReconstruction";
 
 /**
@@ -93,6 +99,28 @@ class NodeService {
             return updatedNodes;
         } catch (error) {
             console.error("Error updating widths:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a node and all its descendants
+     * @param {string} nodeId - Node ID to delete
+     * @returns {Promise<void>}
+     */
+    async deleteNode(nodeId) {
+        try {
+            await deleteNode({ nodeId });
+
+            // Remove from cache if present
+            for (const [conversationId, nodes] of this.conversationCache) {
+                const updatedNodes = nodes.filter((node) => node.id !== nodeId);
+                if (updatedNodes.length !== nodes.length) {
+                    this.conversationCache.set(conversationId, updatedNodes);
+                }
+            }
+        } catch (error) {
+            console.error("Error deleting node:", error);
             throw error;
         }
     }

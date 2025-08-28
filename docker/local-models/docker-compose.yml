@@ -1,0 +1,27 @@
+services:
+    ollama:
+        image: ollama/ollama:latest
+        container_name: non-linear-chatbot-ollama
+        ports:
+            - "11434:11434"
+        volumes:
+            - ollama_data:/root/.ollama
+        environment:
+            - OLLAMA_HOST=0.0.0.0
+        restart: unless-stopped
+        networks:
+            - local-ai
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+
+volumes:
+    ollama_data:
+        driver: local
+
+networks:
+    local-ai:
+        driver: bridge

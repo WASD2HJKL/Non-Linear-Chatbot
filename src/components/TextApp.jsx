@@ -6,7 +6,7 @@ import TextAppMessageList from "./TextAppMessageList";
 import Constants from "../constants/Constants";
 import apiClientService from "../services/apiClientService";
 
-function TextApp({ resetFlag, initialMessages, onNewMessagePair, config, apiSettings, conversationId }) {
+function TextApp({ resetFlag, initialMessages, onNewMessagePair, config, conversationId }) {
     // Set to true to block the user from sending another message
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState([]);
@@ -61,35 +61,26 @@ function TextApp({ resetFlag, initialMessages, onNewMessagePair, config, apiSett
 
             let accumulated = "";
 
-            // Handle both quoted and unquoted provider values (fix for double-stringification bug)
-            const provider = apiSettings.provider.replace(/"/g, "");
+            // Handle streaming for all providers (server normalizes all responses to same NDJSON format)
+            try {
+                // Manual iteration through async iterator
+                while (true) {
+                    const result = await stream.next();
 
-            if (provider === "openai") {
-                // Handle OpenAI streaming
-                try {
-                    // Manual iteration through async iterator
-                    while (true) {
-                        const result = await stream.next();
-
-                        if (result.done) {
-                            break;
-                        }
-
-                        const part = result.value;
-                        const delta = part.choices[0].delta.content;
-                        if (delta) {
-                            accumulated += delta;
-                            updateLastMessageContent(accumulated);
-                        }
+                    if (result.done) {
+                        break;
                     }
-                } catch (streamError) {
-                    console.error("Error in stream consumption:", streamError);
-                    throw streamError;
+
+                    const part = result.value;
+                    const delta = part.choices[0].delta.content;
+                    if (delta) {
+                        accumulated += delta;
+                        updateLastMessageContent(accumulated);
+                    }
                 }
-            } else if (provider === "anthropic") {
-                // This is a placeholder for Anthropic streaming
-                // In a real implementation, this would handle Anthropic's specific streaming format
-                throw new Error("Anthropic API integration is incomplete in this demo");
+            } catch (streamError) {
+                console.error("Error in stream consumption:", streamError);
+                throw streamError;
             }
 
             // Notify parent about the new message pair
