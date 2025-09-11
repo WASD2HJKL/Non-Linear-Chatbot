@@ -82,6 +82,23 @@ export default {
                     },
                 ],
             },
+            {
+                id: "groq",
+                name: "Groq",
+                url: "https://api.groq.com/openai/v1",
+                timeout: 100000,
+                retries: 3,
+                models: [
+                    {
+                        id: "openai/gpt-oss-20b",
+                        name: "GPT-OSS-20b",
+                    },
+                    {
+                        id: "openai/gpt-oss-120b",
+                        name: "GPT-OSS-120b",
+                    },
+                ],
+            },
         ],
         defaultProvider: "openai",
         defaultModel: "gpt-4o-mini",
