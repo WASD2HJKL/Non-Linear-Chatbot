@@ -16,6 +16,10 @@ export default {
                 retries: 3,
                 models: [
                     {
+                        id: "gpt-5.2-pro",
+                        name: "GPT 5.2 Pro",
+                    },
+                    {
                         id: "gpt-4o",
                         name: "GPT-4o",
                     },
@@ -24,8 +28,8 @@ export default {
                         name: "GPT-4.1",
                     },
                     {
-                        id: "gpt-5-chat-latest",
-                        name: "GPT-5 Chat",
+                        id: "gpt-5.2-chat-latest",
+                        name: "GPT-5.2",
                     },
                     {
                         id: "gpt-4o-mini",
@@ -40,20 +44,12 @@ export default {
                         name: "GPT-4.1 Nano",
                     },
                     {
-                        id: "gpt-5",
-                        name: "GPT-5 Thinking",
+                        id: "gpt-5.2",
+                        name: "GPT-5.2 Thinking",
                     },
                     {
                         id: "gpt-5-mini",
                         name: "GPT-5 Mini",
-                    },
-                    {
-                        id: "o4-mini",
-                        name: "O4 Mini",
-                    },
-                    {
-                        id: "gpt-5-nano",
-                        name: "GPT-5 Nano",
                     },
                 ],
             },
@@ -65,20 +61,12 @@ export default {
                 retries: 3,
                 models: [
                     {
-                        id: "gemini-2.5-pro",
-                        name: "Gemini 2.5 Pro",
+                        id: "gemini-3-pro-preview",
+                        name: "Gemini 3 Pro Preview",
                     },
                     {
-                        id: "gemini-2.5-flash",
-                        name: "Gemini 2.5 Flash",
-                    },
-                    {
-                        id: "gemini-2.5-flash-lite",
-                        name: "Gemini 2.5 Flash-Lite",
-                    },
-                    {
-                        id: "gemini-2.0-flash",
-                        name: "Gemini 2.0 Flash",
+                        id: "gemini-3-flash-preview",
+                        name: "Gemini 3 Flash Preview",
                     },
                 ],
             },
